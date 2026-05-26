@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIHK GTM Capacity Planner v3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Familjen+Grotesk:wght@400;500;600;700&display=swap');
+:root{--bg:#fff;--bg2:#f4f7f4;--bg3:#e8f0e8;--panel:#fff;--bdr:#c8d8c8;--bdr2:#9dba9d;--grn:#1a5c38;--grn2:#0d3d24;--grn3:#e8f0e8;--amb:#b45309;--red:#c0392b;--blu:#1a3a8a;--pur:#5b3a8a;--tx:#0d2b1a;--tx2:#2d5a3d;--tx3:#5a8a6a;--mono:'IBM Plex Mono',monospace;--sans:'Familjen Grotesk',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100vh;font-size:14px}
+
+/* TOPBAR */
+.topbar{background:var(--grn);border-bottom:2px solid var(--grn2);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:300}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;background:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--grn)}
+.brand-name{font-weight:700;font-size:14px;color:#fff}
+.brand-tag{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.55)}
+.mod-tabs{display:flex;gap:2px;background:rgba(255,255,255,0.12);border-radius:7px;padding:3px}
+.mod-btn{padding:5px 14px;border:none;border-radius:5px;background:transparent;color:rgba(255,255,255,0.65);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
+.mod-btn:hover{color:#fff}
+.mod-btn.active{background:#fff;color:var(--grn)}
+
+/* SCENARIO BAR */
+.scenbar{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:8px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.scen-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1.5px solid var(--bdr);background:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.scen-chip:hover{border-color:var(--grn)}
+.scen-chip.active{background:var(--grn);color:#fff;border-color:var(--grn)}
+.scen-chip .scen-del{margin-left:4px;opacity:.5;font-size:10px}
+.scen-chip:hover .scen-del{opacity:1}
+.scenbar-actions{display:flex;gap:6px;margin-left:auto}
+.sc-btn{padding:5px 12px;border-radius:6px;border:1.5px solid var(--bdr);background:#fff;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--tx2)}
+.sc-btn:hover{border-color:var(--grn);color:var(--grn)}
+.sc-btn.primary{background:var(--grn);color:#fff;border-color:var(--grn)}
+.sc-btn.primary:hover{background:var(--grn2)}
+.sc-btn.danger{border-color:#fca5a5;color:var(--red)}
+.sc-btn.danger:hover{background:#fee2e2}
+
+/* LAYOUT */
+.shell{display:none}
+.shell.active{display:flex;min-height:calc(100vh - 102px)}
+.sidebar{width:360px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--bdr);padding:18px 16px;overflow-y:auto;max-height:calc(100vh - 102px);position:sticky;top:102px}
+.main-area{flex:1;padding:22px 28px;overflow-y:auto;background:var(--bg)}
+
+/* PERIOD TABS */
+.period-tabs{display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:3px;margin-bottom:14px}
+.per-btn{flex:1;padding:5px;border:none;border-radius:5px;background:transparent;color:var(--tx3);font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.per-btn.active{background:var(--grn);color:#fff}
+
+/* FORM */
+.sec-label{font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--grn);margin-bottom:9px;padding-bottom:5px;border-bottom:2px solid var(--grn)}
+.fg{margin-bottom:10px}
+.lbl{display:block;font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:3px}
+.inp,.sel{width:100%;padding:6px 8px;background:#fff;border:1.5px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s,box-shadow .15s}
+.inp:focus,.sel:focus{border-color:var(--grn);box-shadow:0 0 0 3px rgba(26,92,56,.1)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.div{height:1px;background:var(--bdr);margin:14px 0}
+
+/* PRODUCT CARD */
+.pcard{background:#fff;border:1.5px solid var(--bdr);border-radius:9px;margin-bottom:9px;overflow:hidden;transition:border-color .2s,box-shadow .2s}
+.pcard:hover{border-color:var(--grn);box-shadow:0 2px 8px rgba(26,92,56,.1)}
+.pcard-head{padding:8px 11px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:var(--bg3)}
+.pcard-left{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+.pdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.pname-inp{background:transparent;border:none;outline:none;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--tx);width:100%;min-width:0}
+.phase-sel{width:82px;padding:2px 5px;background:#fff;border:1.5px solid var(--bdr);border-radius:5px;color:var(--tx);font-family:var(--mono);font-size:9px;outline:none}
+.rm-btn{padding:2px 7px;border:1.5px solid rgba(192,57,43,.3);background:transparent;border-radius:4px;color:var(--red);font-size:10px;cursor:pointer;transition:background .15s}
+.rm-btn:hover{background:rgba(192,57,43,.08)}
+.chev{color:var(--tx3);font-size:9px;transition:transform .2s;margin-left:5px}
+.pcard.collapsed .chev{transform:rotate(-90deg)}
+.pcard.collapsed .pcard-body{display:none}
+.pcard-body{padding:11px;background:#fafcfa}
+
+/* GUIDANCE */
+.guide-pill{display:flex;align-items:flex-start;gap:7px;background:#fffbf0;border:1.5px solid #e8d5a0;border-left:4px solid var(--amb);border-radius:7px;padding:9px 11px;margin-bottom:11px}
+.guide-title{font-weight:700;color:#92400e;font-size:10px;margin-bottom:3px}
+.guide-text{font-size:10px;color:#6b4c10;line-height:1.5;font-family:var(--mono)}
+.guide-segs{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.gseg{font-size:9px;padding:2px 7px;border-radius:20px;font-weight:700;font-family:var(--mono)}
+
+/* SEG GRID */
+.seg-grid{display:grid;grid-template-columns:50px repeat(5,1fr);gap:3px;margin-bottom:3px}
+.seg-hdr{font-family:var(--mono);font-size:9px;color:var(--tx3);text-align:center;padding:1px 0;font-weight:600}
+.seg-lbl{font-size:10px;color:var(--tx2);display:flex;align-items:center;font-weight:600}
+.seg-inp{width:100%;padding:4px 2px;text-align:center;background:#fff;border:1.5px solid var(--bdr);border-radius:4px;color:var(--tx);font-family:var(--mono);font-size:11px;outline:none;transition:border-color .15s;min-width:0}
+.seg-inp:focus{border-color:var(--grn)}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:7px;border:none;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;transition:all .18s}
+.btn-grn{background:var(--grn);color:#fff}
+.btn-grn:hover{background:var(--grn2);transform:translateY(-1px);box-shadow:0 4px 14px rgba(26,92,56,.25)}
+.btn-ghost{background:transparent;color:var(--tx2);border:1.5px solid var(--bdr)}
+.btn-ghost:hover{border-color:var(--grn);color:var(--grn)}
+.btn-full{width:100%}
+.btn-sm{padding:5px 10px;font-size:11px}
+.add-btn{width:100%;padding:7px;border:2px dashed var(--bdr2);border-radius:7px;background:transparent;color:var(--grn);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .18s;text-align:center}
+.add-btn:hover{background:var(--bg3);border-color:var(--grn)}
+.btn-row{display:flex;gap:6px;margin-top:12px}
+
+/* RESULTS */
+.results-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.results-title{font-size:20px;font-weight:700;color:var(--tx)}
+.results-sub{font-family:var(--mono);font-size:10px;color:var(--tx3);margin-top:2px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:#fff;border:1.5px solid var(--bdr);border-radius:9px;padding:13px 15px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.kpi-lbl{font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin-bottom:5px}
+.kpi-val{font-size:22px;font-weight:700;font-family:var(--mono);line-height:1}
+.kpi-sub{font-family:var(--mono);font-size:9px;color:var(--tx3);margin-top:4px}
+
+.tcard{background:#fff;border:1.5px solid var(--bdr);border-radius:9px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.tcard-head{padding:11px 16px;background:var(--grn);border-bottom:1px solid var(--grn2);display:flex;align-items:center;justify-content:space-between}
+.tcard-title{font-size:12px;font-weight:700;color:#fff}
+.tcard-sub{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,.6)}
+table{width:100%;border-collapse:collapse}
+th{padding:7px 11px;text-align:left;font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);background:var(--bg3);border-bottom:1.5px solid var(--bdr)}
+th.r,td.r{text-align:right}
+td{padding:8px 11px;font-family:var(--mono);font-size:11px;border-bottom:1px solid #eaf0ea;color:var(--tx)}
+tr:last-child td{border-bottom:none}
+tr.total td{background:var(--bg3);font-weight:700;border-bottom:none;color:var(--tx)}
+tr:hover td{background:#f7fbf7}
+
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-family:var(--mono);font-size:9px;font-weight:700;white-space:nowrap}
+.b-ok{background:#dcf5e8;color:#166534}
+.b-warn{background:#fef3c7;color:#92400e}
+.b-over{background:#fee2e2;color:#991b1b}
+
+.ubar{display:flex;align-items:center;gap:6px}
+.ubar-track{flex:1;height:5px;background:#d4e6d4;border-radius:3px;overflow:hidden;min-width:50px}
+.ubar-fill{height:100%;border-radius:3px;transition:width .7s ease}
+.ubar-pct{font-family:var(--mono);font-size:10px;font-weight:700;min-width:36px;text-align:right}
+
+/* INSIGHTS */
+.insight-box{background:#f4faf6;border:1.5px solid var(--bdr2);border-left:4px solid var(--grn);border-radius:9px;padding:14px 18px;margin-bottom:14px}
+.insight-title{font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);margin-bottom:9px}
+.insight-item{display:flex;gap:8px;margin-bottom:7px;font-size:12px;color:#1e4a2e;line-height:1.5}
+.insight-item:last-child{margin-bottom:0}
+.ia{color:var(--grn);flex-shrink:0;font-family:var(--mono);font-weight:700}
+.insight-item.warn .ia{color:var(--amb)}
+.insight-item.warn{color:#5c2d00}
+.insight-item.crit .ia{color:var(--red)}
+.insight-item.crit{color:#7c1f1f}
+
+/* EXPERT GUIDANCE PANEL */
+.expert-panel{background:linear-gradient(135deg,#f0f7f3,#e8f5ee);border:1.5px solid var(--bdr2);border-radius:9px;padding:14px 18px;margin-bottom:14px}
+.expert-title{font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.expert-norm{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #c8e0d0}
+.expert-norm:last-child{border-bottom:none}
+.norm-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.norm-body{flex:1}
+.norm-label{font-size:11px;font-weight:700;color:var(--tx);margin-bottom:2px}
+.norm-text{font-size:10px;color:var(--tx2);line-height:1.5;font-family:var(--mono)}
+.norm-verdict{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--mono);margin-top:4px}
+.vd-ok{background:#dcf5e8;color:#166534}
+.vd-warn{background:#fef3c7;color:#92400e}
+.vd-crit{background:#fee2e2;color:#991b1b}
+
+/* PERIOD TIMELINE */
+.timeline{display:flex;gap:0;margin-bottom:16px;overflow-x:auto}
+.tl-period{flex:1;min-width:160px;background:#fff;border:1.5px solid var(--bdr);border-right:none;padding:10px 12px;position:relative;cursor:pointer;transition:background .15s}
+.tl-period:first-child{border-radius:8px 0 0 8px}
+.tl-period:last-child{border-right:1.5px solid var(--bdr);border-radius:0 8px 8px 0}
+.tl-period.active{background:var(--grn3);border-color:var(--grn)}
+.tl-period.active+.tl-period{border-left-color:var(--grn)}
+.tl-period-name{font-size:11px;font-weight:700;color:var(--tx);margin-bottom:3px}
+.tl-period-sub{font-size:9px;font-family:var(--mono);color:var(--tx3)}
+.tl-util{height:4px;background:#d4e6d4;border-radius:2px;margin-top:6px;overflow:hidden}
+.tl-util-fill{height:100%;border-radius:2px;transition:width .6s}
+.tl-util-pct{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:3px}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:70px 24px}
+.empty-icon{font-size:44px;opacity:.2;margin-bottom:14px}
+.empty-t{font-size:16px;font-weight:700;color:var(--tx3);margin-bottom:5px}
+.empty-s{font-family:var(--mono);font-size:10px;color:var(--tx3)}
+
+/* STACKED BAR */
+.stack-bar{height:22px;border-radius:4px;overflow:hidden;display:flex;background:var(--bg3)}
+.stack-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;overflow:hidden;white-space:nowrap;transition:width .7s ease;font-family:var(--mono)}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:3px}
+.filter-tab{padding:3px 10px;border-radius:4px;border:1.5px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.65);font-family:var(--mono);font-size:9px;font-weight:700;cursor:pointer;transition:all .15s}
+.filter-tab:hover{color:#fff}
+.filter-tab.active{background:#fff;color:var(--grn);border-color:#fff}
+
+/* REP CARD */
+.rep-card{background:#fff;border:1.5px solid var(--bdr);border-radius:9px;margin-bottom:9px;overflow:hidden}
+.rep-head{padding:8px 11px;background:var(--bg3);display:flex;align-items:center;justify-content:space-between}
+.rep-name-inp{background:transparent;border:none;outline:none;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--tx);width:100%}
+.rep-body{padding:10px}
+.alloc-hcp-inp{width:100%;padding:3px 2px;text-align:center;background:#fff;border:1px solid var(--bdr);border-radius:4px;color:var(--tx);font-family:var(--mono);font-size:10px;outline:none;min-width:0}
+.alloc-hcp-inp:focus{border-color:var(--grn)}
+
+/* EXPORT MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;padding:24px 28px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:6px;color:var(--tx)}
+.modal-sub{font-size:12px;color:var(--tx3);margin-bottom:18px;font-family:var(--mono)}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.export-opt{flex:1;min-width:120px;padding:12px;border:1.5px solid var(--bdr);border-radius:8px;background:#fafcfa;cursor:pointer;transition:all .15s;text-align:center}
+.export-opt:hover{border-color:var(--grn);background:var(--bg3)}
+.export-opt-icon{font-size:22px;margin-bottom:5px}
+.export-opt-label{font-size:11px;font-weight:700;color:var(--tx)}
+.export-opt-sub{font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:2px}
+
+/* COMPARE */
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.compare-card{background:#fff;border:1.5px solid var(--bdr);border-radius:9px;overflow:hidden}
+.compare-head{padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--bdr)}
+.compare-metric{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid #eaf0ea;font-size:12px}
+.compare-metric:last-child{border-bottom:none}
+
+/* FOOTER */
+footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;display:flex;align-items:center;justify-content:space-between;font-family:var(--mono)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">BI</div>
+    <div>
+      <div class="brand-name">GTM Capacity Planner</div>
+      <div class="brand-tag">BIHK · Internal Use Only · v3.0</div>
+    </div>
+  </div>
+  <div class="mod-tabs">
+    <button class="mod-btn active" onclick="switchMod('product',this)">📦 Product Simulation</button>
+    <button class="mod-btn" onclick="switchMod('team',this)">👥 Team Capacity</button>
+    <button class="mod-btn" onclick="switchMod('compare',this)">📊 Compare Scenarios</button>
+  </div>
+</div>
+
+<!-- SCENARIO BAR -->
+<div class="scenbar">
+  <div style="font-family:var(--mono);font-size:10px;color:var(--tx3);font-weight:700;margin-right:4px">SCENARIO:</div>
+  <div id="scen-chips"></div>
+  <div class="scenbar-actions">
+    <button class="sc-btn" onclick="newScenario()">＋ New Scenario</button>
+    <button class="sc-btn" onclick="cloneScenario()">⎘ Clone</button>
+    <button class="sc-btn" onclick="showExportModal()">⬇ Save / Export</button>
+    <button class="sc-btn" onclick="importScenario()">⬆ Load</button>
+  </div>
+</div>
+
+<!-- ══ MODULE A: PRODUCT SIMULATION ══ -->
+<div class="shell active" id="shell-product">
+<aside class="sidebar">
+  <div class="sec-label">Planning Period</div>
+  <div class="period-tabs" id="period-tabs"></div>
+  <button class="add-btn" style="margin-bottom:12px" onclick="addPeriod()">＋ Add Period</button>
+
+  <div class="sec-label">Team Setup</div>
+  <div class="row2">
+    <div class="fg"><label class="lbl">No. of Reps</label><input class="inp" type="number" id="p-reps" value="4" min="1" max="30" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Calls / Day</label><input class="inp" type="number" id="p-cpd" value="8" min="1" max="15" oninput="markDirty()"></div>
+  </div>
+  <div class="row2">
+    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="p-days" value="115" oninput="markDirty()"></div>
+  </div>
+  <div class="fg"><label class="lbl">TA Team Name</label><input class="inp" type="text" id="p-team" value="Respiratory / Rheumatology" oninput="markDirty()"></div>
+
+  <div class="div"></div>
+  <div class="sec-label">Products</div>
+  <div id="prod-list"></div>
+  <button class="add-btn" onclick="addProd()">＋ Add Product</button>
+
+  <div class="btn-row">
+    <button class="btn btn-grn btn-full" onclick="runProdSim()">▶ Run Simulation</button>
+  </div>
+</aside>
+<main class="main-area" id="prod-results">
+  <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-t">Configure & Run Simulation</div><div class="empty-s">Add products and periods, then click Run Simulation</div></div>
+</main>
+</div>
+
+<!-- ══ MODULE B: TEAM CAPACITY ══ -->
+<div class="shell" id="shell-team">
+<aside class="sidebar">
+  <div class="sec-label">Team Settings</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Sync from Product Simulation settings</span>
+    <button class="sc-btn" style="font-size:10px;padding:3px 10px" onclick="syncTeamSettings()">⟳ Sync</button>
+  </div>
+  <div class="row2">
+    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="t-days" value="115" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Calls/Day</label><input class="inp" type="number" id="t-cpd" value="8" oninput="markDirty()"></div>
+  </div>
+  <div class="fg"><label class="lbl">Planning Period</label>
+    <select class="sel" id="t-period" oninput="markDirty()">
+      <option value="0.5">Half Year</option>
+      <option value="1" selected>Full Year</option>
+    </select>
+  </div>
+
+  <div class="div"></div>
+  <div class="sec-label">Products &amp; Call Freq / Cycle</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--tx3);margin-bottom:7px">Set freq per segment × sector. Applied to all reps automatically.</div>
+  <div id="team-prod-ref"></div>
+  <button class="add-btn" onclick="addTeamProd()">＋ Add Product</button>
+
+  <div class="div"></div>
+  <div class="sec-label">Field Force — HCPs by Segment</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--tx3);margin-bottom:7px">Enter HCPs by segment × sector. Calls auto-calculated.</div>
+  <div id="rep-list"></div>
+  <button class="add-btn" onclick="addRep()">＋ Add Rep</button>
+
+  <div class="btn-row">
+    <button class="btn btn-grn btn-full" onclick="runTeamSim()">▶ Run Team Analysis</button>
+  </div>
+</aside>
+<main class="main-area" id="team-results">
+  <div class="empty-state"><div class="empty-icon">👥</div><div class="empty-t">Configure Team & Run</div><div class="empty-s">Add products with call frequencies and reps with HCP counts</div></div>
+</main>
+</div>
+
+<!-- ══ MODULE C: COMPARE ══ -->
+<div class="shell" id="shell-compare">
+<main class="main-area" style="width:100%;max-width:none" id="compare-results">
+  <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-t">Run Simulations First</div><div class="empty-s">Save at least 2 scenarios in Product Simulation, then compare here</div></div>
+</main>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="export-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-title">💾 Save / Export</div>
+    <div class="modal-sub">Scenario: <strong id="modal-scen-name"></strong></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="export-opt" onclick="exportJSON()">
+        <div class="export-opt-icon">📄</div>
+        <div class="export-opt-label">Save as JSON</div>
+        <div class="export-opt-sub">Reload later in this tool</div>
+      </div>
+      <div class="export-opt" onclick="exportCSV()">
+        <div class="export-opt-icon">📊</div>
+        <div class="export-opt-label">Export to CSV</div>
+        <div class="export-opt-sub">Open in Excel</div>
+      </div>
+      <div class="export-opt" onclick="exportPDF()">
+        <div class="export-opt-icon">📋</div>
+        <div class="export-opt-label">Save as PDF</div>
+        <div class="export-opt-sub">A4 format, print-ready</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding:10px 12px;background:#f4faf6;border-radius:7px;border:1px solid var(--bdr2)">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--grn);margin-bottom:4px">⬆ Load a previously saved scenario</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--tx3);margin-bottom:8px">Select a JSON file you exported earlier. It will be added as a new scenario in this session.</div>
+      <button class="btn btn-grn btn-sm" onclick="document.getElementById('export-modal').style.display='none';importScenario()">📂 Choose JSON file to load</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('export-modal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<input type="file" id="file-import" style="display:none" accept=".json" onchange="handleImport(event)">
+
+<script>
+// ═══════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════
+const COLS=['#1a8a5c','#3b7fd4','#7c52c8','#c87a00','#c0392b','#2e86ab','#d46b3b','#5c8a2e'];
+const SEGS=['Gain','Build','Defend','Maintain','Observe'];
+const SEG_COLORS={Gain:'#c87a00',Build:'#3b7fd4',Defend:'#1a8a5c',Maintain:'#7c52c8',Observe:'#5a6a85'};
+const PHASE_CFG={
+  launch:{label:'Launch',color:'#7c52c8',
+    segs:{Gain:'50–70%',Build:'15–25%',Defend:'0–5%',Maintain:'5–10%',Observe:'5–10%'},
+    freqGov:{Gain:6,Build:8,Defend:8,Maintain:4,Observe:2},
+    freqPvt:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2},
+    notes:'Gov: lower Gain freq until formulary listing. Private: primary conversion focus.',
+    norms:{gainPct:[50,70],buildPct:[15,25],callReturn:'Low — invest in KOL seeding'}},
+  growth:{label:'Growth',color:'#3b7fd4',
+    segs:{Gain:'35–50%',Build:'25–35%',Defend:'10–15%',Maintain:'5–10%',Observe:'5–10%'},
+    freqGov:{Gain:16,Build:22,Defend:18,Maintain:7,Observe:3},
+    freqPvt:{Gain:18,Build:24,Defend:20,Maintain:8,Observe:4},
+    notes:'Prioritise Gain→Build conversion. Defend loyalty emerging prescribers.',
+    norms:{gainPct:[35,50],buildPct:[25,35],callReturn:'Medium — ROI improving'}},
+  maturation:{label:'Mature',color:'#1a8a5c',
+    segs:{Gain:'20–30%',Build:'30–40%',Defend:'25–35%',Maintain:'5–10%',Observe:'<5%'},
+    freqGov:{Gain:16,Build:26,Defend:22,Maintain:6,Observe:2},
+    freqPvt:{Gain:10,Build:20,Defend:18,Maintain:5,Observe:0},
+    notes:'Shift resources to Build+Defend. Gain still matters for market expansion.',
+    norms:{gainPct:[20,30],buildPct:[30,40],callReturn:'High — defend revenue base'}},
+  loe:{label:'LOE',color:'#c0392b',
+    segs:{Gain:'<10%',Build:'15–25%',Defend:'60–75%',Maintain:'5–10%',Observe:'~0%'},
+    freqGov:{Gain:4,Build:14,Defend:18,Maintain:4,Observe:0},
+    freqPvt:{Gain:4,Build:12,Defend:16,Maintain:4,Observe:0},
+    notes:'Harvest mode. Protect top Defend HCPs only. Eliminate Observe entirely.',
+    norms:{gainPct:[0,10],buildPct:[15,25],callReturn:'Declining — optimise ruthlessly'}}
+};
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let scenarios=[{id:'s1',name:'Scenario 1',prods:[],periods:[],savedResult:null,teamProds:[],reps:[],teamResult:null}];
+let activeSId='s1';
+let scIdC=1,prodIdC=0,periodIdC=0,repIdC=0;
+let isDirty=false;
+
+function S(){return scenarios.find(s=>s.id===activeSId)}
+function markDirty(){isDirty=true;renderScenChips()}
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
+function fmt(n,d=0){if(n===null||n===undefined||isNaN(n))return'—';return n.toLocaleString('en-HK',{minimumFractionDigits:d,maximumFractionDigits:d})}
+function barCol(u){if(u>1)return'#c0392b';if(u>.88)return'#b45309';return'#1a8a5c'}
+function sBadge(u){if(u>1)return'<span class="badge b-over">⚠ OVER</span>';if(u>.88)return'<span class="badge b-warn">⚡ TIGHT</span>';return'<span class="badge b-ok">✓ OK</span>'}
+function ubar(u){const p=Math.min(u*100,100),c=barCol(u);return`<div class="ubar"><div class="ubar-track"><div class="ubar-fill" style="width:${p}%;background:${c}"></div></div><div class="ubar-pct" style="color:${c}">${(u*100).toFixed(1)}%</div></div>`}
+
+// ═══════════════════════════════════════════
+// MODULE SWITCHING
+// ═══════════════════════════════════════════
+function switchMod(mod,btn){
+  document.querySelectorAll('.shell').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.mod-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('shell-'+mod).classList.add('active');
+  btn.classList.add('active');
+  if(mod==='team'){syncTeamSettings(true);syncTeamProds();renderTeamProdRef();renderRepList()}
+  if(mod==='compare')renderCompare()
+}
+function syncTeamSettings(silent=false){
+  const days=document.getElementById('p-days').value;
+  const cpd=document.getElementById('p-cpd').value;
+  const repsN=document.getElementById('p-reps').value;
+  if(days)document.getElementById('t-days').value=days;
+  if(cpd)document.getElementById('t-cpd').value=cpd;
+  // Infer period from first planning period
+  if(periods.length>0){
+    const h=periods[0].halfYears;
+    document.getElementById('t-period').value=h<=1?0.5:1;
+  }
+  markDirty();
+  if(!silent){
+    const btn=document.querySelector('[onclick*="syncTeamSettings"]');
+    if(btn){const orig=btn.textContent;btn.textContent='✓ Synced';btn.style.color='var(--grn)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.color=''},1500);}
+  }
+}
+
+// ═══════════════════════════════════════════
+// SCENARIO MANAGEMENT
+// ═══════════════════════════════════════════
+function renderScenChips(){
+  const el=document.getElementById('scen-chips');
+  el.innerHTML=scenarios.map(s=>{
+    const dirty=s.id===activeSId&&isDirty?'*':'';
+    return`<div class="scen-chip${s.id===activeSId?' active':''}" onclick="activateScen('${s.id}')">
+      <span>${s.name}${dirty}</span>
+      ${scenarios.length>1?`<span class="scen-del" onclick="event.stopPropagation();deleteScen('${s.id}')">✕</span>`:''}
+    </div>`;
+  }).join('');
+}
+function activateScen(id){
+  saveCurrentScenState();
+  activeSId=id;isDirty=false;
+  loadScenState();renderScenChips()
+}
+function newScenario(){
+  saveCurrentScenState();
+  const id='s'+(++scIdC);
+  const name=prompt('Scenario name:',`Scenario ${scIdC}`)||`Scenario ${scIdC}`;
+  scenarios.push({id,name,prods:[],periods:[],savedResult:null,teamProds:[],reps:[],teamResult:null});
+  activeSId=id;isDirty=false;
+  loadScenState();renderScenChips()
+}
+function cloneScenario(){
+  saveCurrentScenState();
+  const src=S();
+  const id='s'+(++scIdC);
+  const name=prompt('Clone name:',src.name+' (copy)')||src.name+' (copy)';
+  const clone=JSON.parse(JSON.stringify(src));
+  clone.id=id;clone.name=name;clone.savedResult=null;clone.teamResult=null;
+  scenarios.push(clone);
+  activeSId=id;isDirty=false;
+  loadScenState();renderScenChips()
+}
+function deleteScen(id){
+  if(!confirm('Delete this scenario?'))return;
+  scenarios=scenarios.filter(s=>s.id!==id);
+  if(activeSId===id)activeSId=scenarios[0].id;
+  loadScenState();renderScenChips()
+}
+function saveCurrentScenState(){
+  const s=S();if(!s)return;
+  s.prods=JSON.parse(JSON.stringify(prods));
+  s.periods=JSON.parse(JSON.stringify(periods));
+  s.teamProds=JSON.parse(JSON.stringify(teamProds));
+  s.reps=JSON.parse(JSON.stringify(reps));
+  s.pReps=document.getElementById('p-reps').value;
+  s.pCpd=document.getElementById('p-cpd').value;
+  s.pDays=document.getElementById('p-days').value;
+  s.pTeam=document.getElementById('p-team').value;
+  s.tDays=document.getElementById('t-days').value;
+  s.tCpd=document.getElementById('t-cpd').value;
+  s.tPeriod=document.getElementById('t-period').value;
+}
+function loadScenState(){
+  const s=S();if(!s)return;
+  prods.length=0;periods.length=0;teamProds.length=0;reps.length=0;
+  if(s.prods)s.prods.forEach(p=>prods.push(p));
+  if(s.periods)s.periods.forEach(p=>periods.push(p));
+  if(s.teamProds)s.teamProds.forEach(p=>teamProds.push(p));
+  if(s.reps)s.reps.forEach(r=>reps.push(r));
+  if(s.pReps!=null)document.getElementById('p-reps').value=s.pReps;
+  if(s.pCpd!=null)document.getElementById('p-cpd').value=s.pCpd;
+  if(s.pDays!=null)document.getElementById('p-days').value=s.pDays;
+  if(s.pTeam)document.getElementById('p-team').value=s.pTeam;
+  if(s.tDays!=null)document.getElementById('t-days').value=s.tDays;
+  if(s.tCpd!=null)document.getElementById('t-cpd').value=s.tCpd;
+  if(s.tPeriod!=null)document.getElementById('t-period').value=s.tPeriod;
+  activePeriodId=periods.length>0?periods[0].id:null;
+  renderPeriodTabs();renderProdList();
+  renderTeamProdRef();renderRepList();
+  document.getElementById('prod-results').innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-t">Scenario loaded — click Run Simulation</div></div>';
+  document.getElementById('team-results').innerHTML='<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-t">Scenario loaded — click Run Team Analysis</div></div>'
+}
+
+// ═══════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════
+function showExportModal(){
+  document.getElementById('modal-scen-name').textContent=S().name;
+  document.getElementById('export-modal').style.display='flex'
+}
+function exportJSON(){
+  saveCurrentScenState();
+  const data=JSON.stringify(scenarios.find(s=>s.id===activeSId),null,2);
+  dl(`BIHK_${S().name.replace(/\s/g,'_')}.json`,data,'application/json')
+}
+function exportCSV(){
+  saveCurrentScenState();const s=S();
+  let csv='Product,Phase,Sector,Gain HCPs,Build HCPs,Defend HCPs,Maintain HCPs,Observe HCPs,Gain Freq,Build Freq,Defend Freq,Maintain Freq,Observe Freq\n';
+  s.prods.forEach(p=>{
+    ['gov','pvt'].forEach(sec=>{
+      csv+=`"${p.name}","${p.phase}","${sec.toUpperCase()}",${SEGS.map(sg=>p.hcps[sec][sg]||0).join(',')},${SEGS.map(sg=>p.freq[sec][sg]||0).join(',')}\n`
+    })
+  });
+  dl(`BIHK_${s.name.replace(/\s/g,'_')}.csv`,csv,'text/csv')
+}
+function exportPDF(){
+  saveCurrentScenState();
+  // Collect visible result content
+  const activeShell=document.querySelector('.shell.active');
+  const mainArea=activeShell?activeShell.querySelector('.main-area'):null;
+  if(!mainArea||mainArea.querySelector('.empty-state')){
+    alert('Please run a simulation first before exporting to PDF.');return;
+  }
+  const scenName=S().name;
+  const ts=new Date().toLocaleString('en-HK');
+  // Build self-contained print window with A4 styling
+  const styles=Array.from(document.styleSheets).map(ss=>{
+    try{return Array.from(ss.cssRules).map(r=>r.cssText).join('\n')}catch{return''}
+  }).join('\n');
+  const content=mainArea.innerHTML;
+  // Build settings summary for PDF
+  const s=S();
+  const activeMod=document.querySelector('.shell.active')?.id||'';
+  const isTeam=activeMod==='shell-team';
+  let settingsRows='';
+  if(!isTeam){
+    // Product simulation settings
+    const pReps=document.getElementById('p-reps')?.value||'—';
+    const pCpd=document.getElementById('p-cpd')?.value||'—';
+    const pDays=document.getElementById('p-days')?.value||'—';
+    const pTeam=document.getElementById('p-team')?.value||'—';
+    const perLabels=(s.periods||[]).map(p=>p.label+' ('+p.halfYears+'H)').join(', ')||'—';
+    settingsRows=`
+      <tr><td>TA Team</td><td>${pTeam}</td><td>No. of Reps</td><td>${pReps}</td></tr>
+      <tr><td>Calls / Day</td><td>${pCpd}</td><td>Working Days</td><td>${pDays}</td></tr>
+      <tr><td>Planning Periods</td><td colspan="3">${perLabels}</td></tr>
+      <tr><td>Products</td><td colspan="3">${(s.prods||[]).map(p=>(p.name||'—')+' ('+((p.phase||'').charAt(0).toUpperCase()+(p.phase||'').slice(1))+')').join(' · ')||'—'}</td></tr>`;
+  } else {
+    // Team capacity settings
+    const tDays=document.getElementById('t-days')?.value||'—';
+    const tCpd=document.getElementById('t-cpd')?.value||'—';
+    const tPeriod=document.getElementById('t-period')?.value==='0.5'?'Half Year':'Full Year';
+    const repNames=(s.reps||[]).map(r=>r.name||'Rep').join(', ')||'—';
+    const prodNames=(s.teamProds||[]).map(p=>p.name||'—').join(', ')||'—';
+    settingsRows=`
+      <tr><td>Planning Period</td><td>${tPeriod}</td><td>Working Days</td><td>${tDays}</td></tr>
+      <tr><td>Calls / Day</td><td>${tCpd}</td><td>No. of Reps</td><td>${(s.reps||[]).length}</td></tr>
+      <tr><td>Products</td><td colspan="3">${prodNames}</td></tr>
+      <tr><td>Field Force</td><td colspan="3">${repNames}</td></tr>`;
+  }
+  const settingsBlock=`<div style="background:#f4f7f4;border:1.5px solid #c8d8c8;border-radius:7px;padding:10px 14px;margin-bottom:14px;break-inside:avoid">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin-bottom:8px">Simulation Settings</div>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt">
+      <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+      <tbody style="font-family:'IBM Plex Mono',monospace">
+        ${settingsRows}
+      </tbody>
+    </table>
+  </div>`;
+
+  const win=window.open('','_blank','width=900,height=700');
+  if(!win){alert('Pop-up blocked. Please allow pop-ups for this site and try again.');return;}
+  win.document.write(`<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<title>BIHK GTM Planner — ${scenName}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Familjen+Grotesk:wght@400;500;600;700&display=swap');
+:root{--bg:#fff;--bg2:#f4f7f4;--bg3:#e8f0e8;--bdr:#c8d8c8;--bdr2:#9dba9d;--grn:#1a5c38;--grn2:#0d3d24;--amb:#b45309;--red:#c0392b;--tx:#0d2b1a;--tx2:#2d5a3d;--tx3:#5a8a6a;--mono:'IBM Plex Mono',monospace;--sans:'Familjen Grotesk',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:#fff;color:var(--tx);font-size:11pt;margin:0;padding:0}
+@page{size:A4;margin:14mm 12mm 14mm 12mm}
+.print-header{background:var(--grn);color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-radius:6px}
+.print-header-title{font-size:14pt;font-weight:700}
+.print-header-meta{font-family:var(--mono);font-size:8pt;opacity:.8;text-align:right}
+.print-btn{background:#fff;color:var(--grn);border:none;padding:7px 18px;border-radius:5px;font-weight:700;cursor:pointer;font-size:11pt;margin-right:6px}
+.print-btn:hover{background:#e8f0e8}
+.no-print{margin-bottom:12px;padding:8px 12px;background:#f4faf6;border-radius:6px;display:flex;gap:8px}
+@media print{.no-print{display:none!important}}
+.results-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+.results-title{font-size:16pt;font-weight:700;color:var(--tx)}
+.results-sub{font-family:var(--mono);font-size:8pt;color:var(--tx3);margin-top:2px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:#fff;border:1.5px solid var(--bdr);border-radius:7px;padding:10px 12px}
+.kpi-lbl{font-family:var(--mono);font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin-bottom:4px}
+.kpi-val{font-size:18pt;font-weight:700;font-family:var(--mono);line-height:1}
+.kpi-sub{font-family:var(--mono);font-size:7pt;color:var(--tx3);margin-top:3px}
+.tcard{background:#fff;border:1.5px solid var(--bdr);border-radius:7px;overflow:hidden;margin-bottom:10px;break-inside:avoid}
+.tcard-head{padding:8px 14px;background:var(--grn);display:flex;align-items:center;justify-content:space-between}
+.tcard-title{font-size:10pt;font-weight:700;color:#fff}
+.tcard-sub{font-family:var(--mono);font-size:7.5pt;color:rgba(255,255,255,.65)}
+table{width:100%;border-collapse:collapse}
+th{padding:5px 9px;text-align:left;font-family:var(--mono);font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);background:var(--bg3);border-bottom:1.5px solid var(--bdr)}
+th.r,td.r{text-align:right}
+td{padding:6px 9px;font-family:var(--mono);font-size:9pt;border-bottom:1px solid #eaf0ea;color:var(--tx)}
+tr.total td{background:var(--bg3);font-weight:700}
+.insight-box{background:#f4faf6;border:1.5px solid var(--bdr2);border-left:4px solid var(--grn);border-radius:7px;padding:10px 14px;margin-bottom:10px;break-inside:avoid}
+.insight-title{font-family:var(--mono);font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grn);margin-bottom:7px}
+.insight-item{display:flex;gap:7px;margin-bottom:5px;font-size:9pt;color:#1e4a2e;line-height:1.4}
+.expert-panel{background:linear-gradient(135deg,#f0f7f3,#e8f5ee);border:1.5px solid var(--bdr2);border-radius:7px;padding:10px 14px;margin-bottom:10px;break-inside:avoid}
+.expert-title{font-family:var(--mono);font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grn);margin-bottom:8px}
+.expert-norm{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #c8e0d0}
+.expert-norm:last-child{border-bottom:none}
+.norm-icon{font-size:13pt;flex-shrink:0}
+.norm-label{font-size:9pt;font-weight:700;color:var(--tx)}
+.norm-text{font-size:8pt;color:var(--tx2);line-height:1.4;font-family:var(--mono);margin-top:2px}
+.norm-verdict{display:inline-flex;padding:1px 7px;border-radius:3px;font-size:7.5pt;font-weight:700;font-family:var(--mono);margin-top:3px}
+.vd-ok{background:#dcf5e8;color:#166534}
+.vd-warn{background:#fef3c7;color:#92400e}
+.vd-crit{background:#fee2e2;color:#991b1b}
+.badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:20px;font-family:var(--mono);font-size:7.5pt;font-weight:700}
+.b-ok{background:#dcf5e8;color:#166534}
+.b-warn{background:#fef3c7;color:#92400e}
+.b-over{background:#fee2e2;color:#991b1b}
+.ubar{display:flex;align-items:center;gap:5px}
+.ubar-track{flex:1;height:5px;background:#d4e6d4;border-radius:2px;overflow:hidden;min-width:50px}
+.ubar-fill{height:100%;border-radius:2px}
+.ubar-pct{font-family:var(--mono);font-size:8pt;font-weight:700;min-width:34px;text-align:right}
+.timeline{display:flex;gap:0;margin-bottom:12px;overflow:visible}
+.tl-period{flex:1;background:#fff;border:1.5px solid var(--bdr);border-right:none;padding:7px 10px}
+.tl-period:last-child{border-right:1.5px solid var(--bdr)}
+.tl-period-name{font-size:9pt;font-weight:700}
+.tl-period-sub{font-size:7.5pt;font-family:var(--mono);color:var(--tx3)}
+.tl-util{height:4px;background:#d4e6d4;border-radius:2px;margin-top:5px;overflow:hidden}
+.tl-util-fill{height:100%;border-radius:2px}
+.tl-util-pct{font-size:8pt;font-family:var(--mono);font-weight:700;margin-top:2px}
+a{color:var(--grn)}
+.sc-btn,.btn,.add-btn,.btn-ghost,.filter-tabs,.btn-row,.filter-tab{display:none!important}
+</style>
+</head><body>
+<div class="no-print">
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span style="font-size:10pt;color:#5a8a6a;font-family:var(--mono)">In print dialog: set paper=A4, enable background graphics</span>
+</div>
+<div class="print-header">
+  <div>
+    <div class="print-header-title">BIHK GTM Capacity Planner</div>
+    <div style="font-family:var(--mono);font-size:9pt;opacity:.8">${scenName}</div>
+  </div>
+  <div class="print-header-meta">Generated: ${ts}<br>For Internal Use Only · Designed by AP</div>
+</div>
+${settingsBlock}
+${content}
+</body></html>`);
+  win.document.close();
+  // Auto-trigger print after fonts load
+  win.onload=()=>setTimeout(()=>{win.focus();win.print();},600);
+}
+function dl(name,data,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([data],{type}));
+  a.download=name;a.click()
+}
+function importScenario(){document.getElementById('file-import').click()}
+function handleImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const id='s'+(++scIdC);
+      data.id=id;data.name=(data.name||'Imported')+' (loaded)';
+      scenarios.push(data);
+      activeSId=id;isDirty=false;
+      loadScenState();renderScenChips();
+      alert('Scenario loaded: '+data.name)
+    }catch{alert('Invalid file. Please import a JSON scenario file.')}
+  };r.readAsText(file);
+  e.target.value=''
+}
+
+// ═══════════════════════════════════════════
+// PERIODS
+// ═══════════════════════════════════════════
+const periods=[];
+let activePeriodId=null;
+function addPeriod(data={}){
+  const id='per'+(++periodIdC);
+  const labels=['2026 1H','2026 2H','2027 1H','2027 2H','2028 1H'];
+  const p={id,label:data.label||labels[periods.length]||`Period ${periodIdC}`,halfYears:data.halfYears||1};
+  periods.push(p);
+  if(!activePeriodId)activePeriodId=id;
+  renderPeriodTabs();markDirty()
+}
+function removePeriod(id){
+  const i=periods.findIndex(p=>p.id===id);if(i!==-1)periods.splice(i,1);
+  if(activePeriodId===id)activePeriodId=periods.length?periods[0].id:null;
+  renderPeriodTabs();markDirty()
+}
+function activatePeriod(id){activePeriodId=id;renderPeriodTabs()}
+function renderPeriodTabs(){
+  const el=document.getElementById('period-tabs');
+  if(!periods.length){el.innerHTML='<div style="font-size:10px;color:var(--tx3);font-family:var(--mono);padding:4px">No periods — add one</div>';return}
+  el.innerHTML=periods.map(p=>`
+    <div class="per-btn${p.id===activePeriodId?' active':''}" onclick="activatePeriod('${p.id}')">
+      <input style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${p.id===activePeriodId?'#fff':'var(--tx)'};width:60px;text-align:center" 
+        value="${p.label}" oninput="updatePeriod('${p.id}','label',this.value)" onclick="event.stopPropagation()">
+      <div style="font-size:9px;margin-top:1px;opacity:.7">
+        <input type="number" min="1" max="4" value="${p.halfYears}" style="width:18px;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:9px;color:inherit;text-align:center" oninput="updatePeriod('${p.id}','halfYears',+this.value)" onclick="event.stopPropagation()">H
+        <span onclick="event.stopPropagation();removePeriod('${p.id}')" style="cursor:pointer;margin-left:3px;opacity:.6">✕</span>
+      </div>
+    </div>`).join('')
+}
+function updatePeriod(id,key,val){const p=periods.find(p=>p.id===id);if(p){p[key]=val;markDirty()}}
+
+// ═══════════════════════════════════════════
+// PRODUCTS (Module A)
+// ═══════════════════════════════════════════
+const prods=[];
+function addProd(data={}){
+  const id=++prodIdC;
+  const color=COLS[(id-1)%COLS.length];
+  const ph=data.phase||'growth';
+  const cfg=PHASE_CFG[ph];
+  const p={id,color,name:data.name||'',phase:ph,
+    hcps:{gov:{Gain:data.gov_gain??0,Build:data.gov_build??0,Defend:data.gov_defend??0,Maintain:data.gov_maintain??0,Observe:data.gov_observe??0},
+          pvt:{Gain:data.pvt_gain??0,Build:data.pvt_build??0,Defend:data.pvt_defend??0,Maintain:data.pvt_maintain??0,Observe:data.pvt_observe??0}},
+    freq:{gov:{...cfg.freqGov,...(data.fgov||{})},pvt:{...cfg.freqPvt,...(data.fpvt||{})}}
+  };
+  prods.push(p);renderProdList();markDirty();return p
+}
+function removeProd(id){const i=prods.findIndex(p=>p.id===id);if(i!==-1)prods.splice(i,1);renderProdList();markDirty()}
+function setProdField(id,path,val){
+  const p=prods.find(p=>p.id===id);if(!p)return;
+  const parts=path.split('.');let obj=p;
+  for(let i=0;i<parts.length-1;i++)obj=obj[parts[i]];
+  obj[parts[parts.length-1]]=isNaN(+val)?val:+val;
+  if(path==='phase'){const cfg=PHASE_CFG[val];p.freq={gov:{...cfg.freqGov},pvt:{...cfg.freqPvt}};renderProdList()}
+  markDirty()
+}
+function setProdFreq(id,sec,seg,val){const p=prods.find(p=>p.id===id);if(p){p.freq[sec][seg]=+val;markDirty()}}
+function calcCalls(p,sec='all'){
+  let t=0;const ss=sec==='all'?['gov','pvt']:[sec];
+  ss.forEach(s=>SEGS.forEach(sg=>t+=(p.hcps[s][sg]||0)*(p.freq[s][sg]||0)));return t
+}
+function calcHCPs(p,sec='all'){
+  let t=0;const ss=sec==='all'?['gov','pvt']:[sec];
+  ss.forEach(s=>SEGS.forEach(sg=>t+=p.hcps[s][sg]||0));return t
+}
+function applyFreqSuggestion(id){
+  const p=prods.find(p=>p.id===id);if(!p)return;
+  const cfg=PHASE_CFG[p.phase];
+  p.freq={gov:{...cfg.freqGov},pvt:{...cfg.freqPvt}};
+  renderProdList()
+}
+
+function buildGuideHTML(id,ph){
+  const cfg=PHASE_CFG[ph];
+  const pills=SEGS.map(s=>`<span class="gseg" style="background:${SEG_COLORS[s]}22;color:${SEG_COLORS[s]};border:1px solid ${SEG_COLORS[s]}44">${s}: ${cfg.segs[s]}</span>`).join('');
+  return`<div class="guide-title">📐 ${cfg.label} Phase — Industry Norms</div>
+    <div class="guide-text" style="margin-bottom:4px">${cfg.notes}</div>
+    <div class="guide-segs">${pills}</div>
+    <div style="font-size:9px;font-family:var(--mono);color:#6b4c10;margin-top:5px">Expected call ROI: ${cfg.norms.callReturn}</div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:7px;font-size:9px" onclick="applyFreqSuggestion(${id})">↓ Apply suggested frequencies</button>`
+}
+
+function renderProdList(){
+  const el=document.getElementById('prod-list');
+  if(!prods.length){el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--tx3);text-align:center;padding:8px">No products added</div>';return}
+  el.innerHTML='';
+  prods.forEach(p=>{
+    const div=document.createElement('div');div.className='pcard';div.id=`pcard-${p.id}`;
+    const freqRows=['gov','pvt'].map(sec=>{
+      const cells=SEGS.map(sg=>`<input class="seg-inp" type="number" min="0" value="${p.freq[sec][sg]}" oninput="setProdFreq(${p.id},'${sec}','${sg}',+this.value)">`).join('');
+      const lbl=sec==='gov'?`<span style="font-size:9px;font-weight:700;color:#1a3a8a;background:#e8f0ff;padding:1px 4px;border-radius:3px">GOV</span>`:`<span style="font-size:9px;font-weight:700;color:#5b3a8a;background:#f0e8ff;padding:1px 3px;border-radius:3px">PVT</span>`;
+      return`<div class="seg-grid" style="margin-bottom:3px"><div class="seg-lbl">${lbl}</div>${cells}</div>`
+    }).join('');
+    div.innerHTML=`
+      <div class="pcard-head" onclick="document.getElementById('pcard-${p.id}').classList.toggle('collapsed')">
+        <div class="pcard-left">
+          <div class="pdot" style="background:${p.color}"></div>
+          <input class="pname-inp" value="${p.name}" placeholder="Product name" oninput="setProdField(${p.id},'name',this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <select class="phase-sel" onclick="event.stopPropagation()" onchange="setProdField(${p.id},'phase',this.value)">
+            ${Object.keys(PHASE_CFG).map(k=>`<option value="${k}"${p.phase===k?' selected':''}>${PHASE_CFG[k].label}</option>`).join('')}
+          </select>
+          <button class="rm-btn" onclick="event.stopPropagation();removeProd(${p.id})">✕</button>
+          <span class="chev">▾</span>
+        </div>
+      </div>
+      <div class="pcard-body">
+        <div class="guide-pill"><div style="font-size:13px;flex-shrink:0">💡</div><div id="gpill-${p.id}">${buildGuideHTML(p.id,p.phase)}</div></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--grn);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">HCPs by Segment &amp; Sector</div>
+        <div class="seg-grid" style="margin-bottom:2px">
+          <div></div>${SEGS.map(s=>`<div class="seg-hdr" style="color:${SEG_COLORS[s]}">${s.substring(0,3)}</div>`).join('')}
+        </div>
+        ${['gov','pvt'].map(sec=>`
+        <div class="seg-grid" style="margin-bottom:3px">
+          <div class="seg-lbl"><span style="font-size:9px;font-weight:700;color:${sec==='gov'?'#1a3a8a':'#5b3a8a'};background:${sec==='gov'?'#e8f0ff':'#f0e8ff'};padding:1px 4px;border-radius:3px">${sec.toUpperCase()}</span></div>
+          ${SEGS.map(sg=>`<input class="seg-inp" type="number" min="0" value="${p.hcps[sec][sg]}" oninput="setProdField(${p.id},'hcps.${sec}.${sg}',+this.value)">`).join('')}
+        </div>`).join('')}
+        <div style="font-family:var(--mono);font-size:9px;color:var(--grn);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin:8px 0 4px">Call Freq / Cycle by Sector</div>
+        <div class="seg-grid" style="margin-bottom:2px">
+          <div></div>${SEGS.map(s=>`<div class="seg-hdr" style="color:${SEG_COLORS[s]}">${s.substring(0,3)}</div>`).join('')}
+        </div>
+        ${freqRows}
+      </div>`;
+    el.appendChild(div)
+  })
+}
+
+// ═══════════════════════════════════════════
+// RUN PRODUCT SIMULATION
+// ═══════════════════════════════════════════
+function runProdSim(){
+  if(!prods.length){alert('Add at least one product.');return}
+  if(!periods.length){alert('Add at least one planning period.');return}
+  const repsN=+document.getElementById('p-reps').value;
+  const cpd=+document.getElementById('p-cpd').value;
+  const days=+document.getElementById('p-days').value;
+  const team=document.getElementById('p-team').value||'Team';
+
+  // Compute per period
+  const periodResults=periods.map(per=>{
+    const cap=days*per.halfYears*cpd*repsN;
+    const capPerRep=cap/repsN;
+    const totalCalls=prods.reduce((s,p)=>s+calcCalls(p)*per.halfYears,0);
+    const govCalls=prods.reduce((s,p)=>s+calcCalls(p,'gov')*per.halfYears,0);
+    const pvtCalls=prods.reduce((s,p)=>s+calcCalls(p,'pvt')*per.halfYears,0);
+    const util=cap>0?totalCalls/cap:0;
+    // per product
+    const byProd=prods.map(p=>({
+      p,calls:calcCalls(p)*per.halfYears,govCalls:calcCalls(p,'gov')*per.halfYears,pvtCalls:calcCalls(p,'pvt')*per.halfYears,hcps:calcHCPs(p)
+    }));
+    return{per,cap,capPerRep,totalCalls,govCalls,pvtCalls,util,byProd}
+  });
+
+  // Save result
+  saveCurrentScenState();S().savedResult={periodResults,repsN,cpd,days,team,prods:JSON.parse(JSON.stringify(prods)),periods:JSON.parse(JSON.stringify(periods)),ts:new Date().toISOString()};
+
+  // Timeline
+  const tlHTML=periodResults.map(r=>{
+    const pct=Math.min(r.util*100,100);const c=barCol(r.util);
+    return`<div class="tl-period${activePeriodId===r.per.id?' active':''}" onclick="activatePeriod('${r.per.id}');renderProdSimResults(savedResults)">
+      <div class="tl-period-name">${r.per.label}</div>
+      <div class="tl-period-sub">${r.per.halfYears}H · ${repsN} reps</div>
+      <div class="tl-util"><div class="tl-util-fill" style="width:${pct}%;background:${c}"></div></div>
+      <div class="tl-util-pct" style="color:${c}">${(r.util*100).toFixed(1)}% ${sBadge(r.util)}</div>
+    </div>`
+  }).join('');
+
+  // Active period details
+  const actR=periodResults.find(r=>r.per.id===activePeriodId)||periodResults[0];
+
+  // Product rows
+  const prodRows=actR.byProd.map(({p,calls,govCalls,pvtCalls,hcps})=>{
+    const cfg=PHASE_CFG[p.phase];
+    return`<tr>
+      <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${p.color};border-radius:50%;display:inline-block"></span><strong>${p.name||'—'}</strong></span></td>
+      <td><span class="badge" style="background:${cfg.color}22;color:${cfg.color};border:1px solid ${cfg.color}44">${cfg.label}</span></td>
+      <td class="r">${fmt(hcps)}</td>
+      <td class="r">${fmt(govCalls)}</td>
+      <td class="r">${fmt(pvtCalls)}</td>
+      <td class="r">${fmt(calls)}</td>
+      <td class="r">${actR.totalCalls>0?(calls/actR.totalCalls*100).toFixed(1):0}%</td>
+      <td>${ubar(calls/actR.cap)}</td>
+    </tr>`
+  }).join('');
+
+  // CVM segment per product
+  const segProdRows=prods.map(p=>{
+    const prodTotal=calcCalls(p);
+    const cells=SEGS.map(sg=>{
+      const c=(p.hcps.gov[sg]||0)*p.freq.gov[sg]+(p.hcps.pvt[sg]||0)*p.freq.pvt[sg];
+      const pct=prodTotal>0?c/prodTotal*100:0;
+      const cfg=PHASE_CFG[p.phase];
+      const range=sg==='Gain'?cfg.norms.gainPct:sg==='Build'?cfg.norms.buildPct:null;
+      const flag=range&&pct>0?(pct<range[0]?'🔽':pct>range[1]?'🔼':'✓'):'';
+      const bg=pct>0?`${SEG_COLORS[sg]}22`:'#f4f7f4';
+      return`<td class="r" style="background:${bg}"><div style="font-weight:700">${fmt(c)}</div><div style="font-size:9px;color:var(--tx3)">${pct.toFixed(0)}% ${flag}</div></td>`
+    }).join('');
+    return`<tr><td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${p.color};border-radius:50%;display:inline-block"></span>${p.name||'—'}</span><br><span class="badge" style="background:${PHASE_CFG[p.phase].color}22;color:${PHASE_CFG[p.phase].color};font-size:8px">${PHASE_CFG[p.phase].label}</span></td>${cells}<td class="r"><strong>${fmt(prodTotal)}</strong></td></tr>`
+  }).join('');
+
+  // Expert guidance
+  const eg=buildExpertGuidance(actR,prods);
+
+  document.getElementById('prod-results').innerHTML=`
+    <div>
+      <div class="results-head">
+        <div><div class="results-title">${team} — Team Capacity</div>
+          <div class="results-sub">${repsN} reps · ${prods.length} products · ${periods.length} period(s) · Saved ${new Date().toLocaleTimeString()}</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="showExportModal()">⬇ Save / Export</button>
+      </div>
+      <div class="timeline">${tlHTML}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--grn);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Details: ${actR.per.label} (${actR.per.halfYears} half-year cycle${actR.per.halfYears>1?'s':''})</div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-lbl">Team Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(actR.cap)}</div><div class="kpi-sub">${fmt(actR.capPerRep)} / rep</div></div>
+        <div class="kpi"><div class="kpi-lbl">Planned Calls</div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over':'available'}</div></div>
+      </div>
+      ${eg}
+      <div class="tcard">
+        <div class="tcard-head"><div class="tcard-title">Call Volume by Product × Sector</div><div class="tcard-sub">${actR.per.label}</div></div>
+        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total</th><th class="r">Share</th><th>vs Capacity</th></tr>
+          ${prodRows}
+          <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}</td><td class="r">100%</td><td>${ubar(actR.util)}</td></tr>
+        </table>
+      </div>
+      <div class="tcard">
+        <div class="tcard-head"><div class="tcard-title">CVM Segment Mix by Product</div><div class="tcard-sub">🔼=Above norm · 🔽=Below norm · ✓=Within range</div></div>
+        <table><tr><th>Product</th>${SEGS.map(s=>`<th class="r" style="color:${SEG_COLORS[s]}">${s}</th>`).join('')}<th class="r">Total Calls</th></tr>
+          ${segProdRows}
+        </table>
+      </div>
+    </div>`
+}
+
+function buildExpertGuidance(actR,prods){
+  const norms=[];
+  const util=actR.util;
+  const govShare=actR.govCalls/actR.totalCalls;
+  const pvtShare=actR.pvtCalls/actR.totalCalls;
+
+  // Capacity
+  if(util>1)norms.push({icon:'🚨',label:'CRITICAL: Over Capacity',
+    text:`Team is ${((util-1)*100).toFixed(0)}% over capacity. Reduce Gain HCP targets, lower Gain call frequency (highest cost, lowest return segment), or negotiate additional headcount before finalising CTEP.`,
+    verdict:'crit',vtext:'OVER CAPACITY'});
+  else if(util>.9)norms.push({icon:'⚠️',label:'HIGH RISK: Near Capacity Ceiling',
+    text:`Team at ${(util*100).toFixed(1)}% — virtually no buffer. Adding any new product without reducing existing call plans will breach capacity. Review Gain call frequency across all products.`,
+    verdict:'warn',vtext:'HIGH RISK'});
+  else if(util<.65)norms.push({icon:'📉',label:'Under-Utilisation',
+    text:`Team at ${(util*100).toFixed(1)}%. Significant spare capacity. Consider expanding HCP target list, increasing Gain coverage for launch products, or redeploying rep time to medical education and speaker programmes.`,
+    verdict:'warn',vtext:'UNDER-SERVED'});
+  else norms.push({icon:'✅',label:'Capacity: Within Target Range',
+    text:`${(util*100).toFixed(1)}% utilisation with ${fmt(actR.cap-actR.totalCalls)} call buffer. A buffer of 10–25% is directionally recommended to accommodate non-consent, admin time, ad-hoc medical requests, and mid-cycle territory adjustments.`,
+    verdict:'ok',vtext:'ON TRACK'});
+
+  // Sector balance
+  if(govShare>.88)norms.push({icon:'🏛',label:'Government Sector Over-Concentration',
+    text:`${(govShare*100).toFixed(0)}% of calls in government. In the HK market context, HA hospitals typically drive the majority of prescription volume, but private sector is strategically important for launch products given faster adoption and no formulary dependency. Consider whether private sector investment is adequate for any launch product in the portfolio.`,
+    verdict:'warn',vtext:'REVIEW'});
+  else if(pvtShare>.55)norms.push({icon:'🏥',label:'Private Sector Dominance',
+    text:`${(pvtShare*100).toFixed(0)}% of calls private. This may be appropriate for launch-phase portfolios. Ensure HA formulary relationships and KOL engagement are maintained in parallel.`,
+    verdict:'ok',vtext:'REVIEW HA'});
+  else norms.push({icon:'⚖️',label:'Sector Balance: Distributed',
+    text:`Gov ${(govShare*100).toFixed(0)}% / Private ${(pvtShare*100).toFixed(0)}%. Coverage appears balanced across sectors. Validate whether the split reflects your revenue contribution and launch priority by product.`,
+    verdict:'ok',vtext:'BALANCED'});
+
+  // Phase mix advice
+  const launches=prods.filter(p=>p.phase==='launch');
+  const matures=prods.filter(p=>p.phase==='maturation'||p.phase==='loe');
+  if(launches.length&&matures.length)norms.push({icon:'🎯',label:'Dual-Brand Portfolio: Share-of-Voice Discipline Required',
+    text:`Portfolio spans launch (${launches.map(p=>p.name||'—').join(', ')}) and mature/LOE (${matures.map(p=>p.name||'—').join(', ')}) products. Without explicit call objective governance, reps tend to default to the established product. Consider mandating product-specific call objectives in CRM and setting a target launch share of voice to monitor.`,
+    verdict:'warn',vtext:'GOVERN SOV'});
+
+  // Gain over-investment check
+  prods.forEach(p=>{
+    if(p.phase==='maturation'||p.phase==='loe'){
+      const gainCalls=(p.hcps.gov['Gain']||0)*p.freq.gov['Gain']+(p.hcps.pvt['Gain']||0)*p.freq.pvt['Gain'];
+      const total=calcCalls(p);
+      if(total>0&&gainCalls/total>.35)norms.push({icon:'💸',label:`${p.name||'Product'}: High Gain Investment for ${PHASE_CFG[p.phase].label} Phase`,
+        text:`Gain segment represents ${(gainCalls/total*100).toFixed(0)}% of ${p.name||'this product'}'s calls. For a ${PHASE_CFG[p.phase].label} product, Gain HCPs are typically lower-probability converters relative to Build and Defend. Consider whether this allocation reflects your conversion data or whether resources could be redeployed to protect existing prescribers.`,
+        verdict:'warn',vtext:'REVIEW ALLOCATION'})
+    }
+  });
+
+  const vClass={ok:'vd-ok',warn:'vd-warn',crit:'vd-crit'};
+  return`<div class="expert-panel">
+    <div class="expert-title">🤖 AI-Generated Planning Guidance</div>
+    <div style="background:#fffbf0;border:1px solid #e8d5a0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:#6b4c10;line-height:1.5">
+      <strong>Disclaimer:</strong> The flags and thresholds below are AI-generated directional guidance based on general commercial planning logic. They are <strong>not derived from any external industry benchmark or published research</strong>. Treat them as prompts for discussion, not prescriptive standards. Calibrate against your own historical performance data and internal SFE guidelines.
+    </div>
+    ${norms.map(n=>`<div class="expert-norm">
+      <div class="norm-icon">${n.icon}</div>
+      <div class="norm-body">
+        <div class="norm-label">${n.label}</div>
+        <div class="norm-text">${n.text}</div>
+        <div class="norm-verdict ${vClass[n.verdict]}">${n.vtext}</div>
+      </div>
+    </div>`).join('')}
+  </div>`
+}
+
+// ═══════════════════════════════════════════
+// DEMO DATA
+// ═══════════════════════════════════════════
+function loadProdDemo(){
+  prods.length=0;prodIdC=0;periods.length=0;periodIdC=0;activePeriodId=null;
+  document.getElementById('p-team').value='Respiratory / Rheumatology';
+  document.getElementById('p-reps').value=4;
+  addPeriod({label:'2026 1H',halfYears:1});
+  addPeriod({label:'2026 2H',halfYears:1});
+  addPeriod({label:'2027 Full',halfYears:2});
+  addProd({name:'Ofev',phase:'maturation',gov_gain:152,gov_build:75,gov_defend:8,gov_maintain:1,gov_observe:0,pvt_gain:0,pvt_build:0,pvt_defend:0,pvt_maintain:18,pvt_observe:13,fgov:{Gain:18,Build:28,Defend:25,Maintain:7,Observe:2},fpvt:{Gain:10,Build:20,Defend:18,Maintain:5,Observe:2}});
+  addProd({name:'Hernexeos',phase:'launch',gov_gain:47,gov_build:0,gov_defend:0,gov_maintain:92,gov_observe:77,pvt_gain:10,pvt_build:0,pvt_defend:0,pvt_maintain:0,pvt_observe:0,fgov:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2},fpvt:{Gain:6,Build:6,Defend:6,Maintain:4,Observe:2}});
+  addProd({name:'Jascayd',phase:'launch',gov_gain:20,gov_build:0,gov_defend:0,gov_maintain:0,gov_observe:0,pvt_gain:50,pvt_build:0,pvt_defend:0,pvt_maintain:0,pvt_observe:0,fgov:{Gain:4,Build:6,Defend:6,Maintain:3,Observe:2},fpvt:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2}});
+  markDirty()
+}
+
+// ═══════════════════════════════════════════
+// TEAM PLANNER
+// ═══════════════════════════════════════════
+const teamProds=[];
+const reps=[];
+function dfSeg(){return{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0}}
+function dfFreq(){return{gov:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2},pvt:{Gain:6,Build:6,Defend:6,Maintain:4,Observe:2}}}
+
+function addTeamProd(data={}){
+  const id='tp'+(++prodIdC);
+  const color=COLS[teamProds.length%COLS.length];
+  teamProds.push({id,name:data.name||'',color,freq:data.freq||dfFreq()});
+  renderTeamProdRef();renderRepList();markDirty()
+}
+function removeTeamProd(id){
+  const i=teamProds.findIndex(p=>p.id===id);if(i!==-1)teamProds.splice(i,1);
+  renderTeamProdRef();renderRepList();markDirty()
+}
+function setTFreq(pid,sec,seg,val){const p=teamProds.find(p=>p.id===pid);if(p){p.freq[sec][seg]=+val;markDirty()}}
+function syncTeamProds(){
+  prods.forEach(p=>{
+    if(!teamProds.find(tp=>tp.id==='sp'+p.id)){
+      teamProds.push({id:'sp'+p.id,name:p.name||'Product '+p.id,color:p.color,freq:{gov:{...p.freq.gov},pvt:{...p.freq.pvt}},synced:true})
+    }
+  })
+}
+
+function renderTeamProdRef(){
+  const el=document.getElementById('team-prod-ref');
+  if(!teamProds.length){el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--tx3);padding:4px">No products. Add manually or sync from Product Simulation first.</div>';return}
+  el.innerHTML=teamProds.map(p=>`
+    <div style="background:#fff;border:1.5px solid var(--bdr);border-radius:8px;padding:8px 10px;margin-bottom:7px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <div class="pdot" style="background:${p.color}"></div>
+        <input style="flex:1;background:transparent;border:none;outline:none;font-size:12px;font-weight:700;color:var(--tx)" value="${p.name}" placeholder="Product name" oninput="teamProds.find(tp=>tp.id==='${p.id}').name=this.value;renderRepList();markDirty()">
+        ${p.synced?'<span style="font-family:var(--mono);font-size:9px;color:var(--tx3);background:var(--bg3);padding:1px 5px;border-radius:3px">sim</span>':''}
+        <button class="rm-btn" onclick="removeTeamProd('${p.id}')">✕</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--tx3);display:grid;grid-template-columns:36px repeat(5,1fr);gap:2px;margin-bottom:2px">
+        <span></span>${SEGS.map(s=>`<span style="text-align:center;font-size:8px">${s.substring(0,3)}</span>`).join('')}
+      </div>
+      ${['gov','pvt'].map(sec=>`
+      <div style="display:grid;grid-template-columns:36px repeat(5,1fr);gap:2px;margin-bottom:2px;align-items:center">
+        <span style="font-size:9px;font-weight:700;color:${sec==='gov'?'#1a3a8a':'#5b3a8a'};background:${sec==='gov'?'#e8f0ff':'#f0e8ff'};padding:1px 3px;border-radius:3px;text-align:center">${sec.toUpperCase()}</span>
+        ${SEGS.map(sg=>`<input style="width:100%;padding:2px;text-align:center;border:1px solid var(--bdr);border-radius:3px;font-family:var(--mono);font-size:10px;background:#fff;color:var(--tx);outline:none;min-width:0" type="number" min="0" value="${p.freq[sec][sg]||0}" oninput="setTFreq('${p.id}','${sec}','${sg}',this.value)">`).join('')}
+      </div>`).join('')}
+    </div>`).join('')
+}
+
+function addRep(data={}){
+  const id=++repIdC;
+  const r={id,name:data.name||'',
+    allocs:teamProds.map(p=>({prodId:p.id,gov:data.gov?.[p.id]?{...data.gov[p.id]}:dfSeg(),pvt:data.pvt?.[p.id]?{...data.pvt[p.id]}:dfSeg()}))
+  };
+  reps.push(r);renderRepList();markDirty()
+}
+function removeRep(id){const i=reps.findIndex(r=>r.id===id);if(i!==-1)reps.splice(i,1);renderRepList();markDirty()}
+function setRHcp(rid,pid,sec,seg,val){const r=reps.find(r=>r.id===rid);if(!r)return;const a=r.allocs.find(a=>a.prodId===pid);if(a)a[sec][seg]=+val;markDirty()}
+
+function renderRepList(){
+  reps.forEach(r=>{
+    teamProds.forEach(p=>{if(!r.allocs.find(a=>a.prodId===p.id))r.allocs.push({prodId:p.id,gov:dfSeg(),pvt:dfSeg()})});
+    r.allocs=r.allocs.filter(a=>teamProds.find(p=>p.id===a.prodId))
+  });
+  const el=document.getElementById('rep-list');
+  if(!reps.length){el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--tx3);text-align:center;padding:8px">No reps added</div>';return}
+  el.innerHTML='';
+  reps.forEach(r=>{
+    const div=document.createElement('div');div.className='rep-card';
+    const aRows=teamProds.map(p=>{
+      const a=r.allocs.find(a=>a.prodId===p.id)||{gov:dfSeg(),pvt:dfSeg()};
+      return`<div style="border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;margin-bottom:5px;background:#fafcfa">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+          <span class="pdot" style="background:${p.color}"></span>
+          <span style="font-size:11px;font-weight:700;color:var(--tx)">${p.name||'—'}</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--tx3);display:grid;grid-template-columns:34px repeat(5,1fr);gap:2px;margin-bottom:2px">
+          <span></span>${SEGS.map(s=>`<span style="text-align:center">${s.substring(0,3)}</span>`).join('')}
+        </div>
+        ${['gov','pvt'].map(sec=>`
+        <div style="display:grid;grid-template-columns:34px repeat(5,1fr);gap:2px;align-items:center;margin-bottom:2px">
+          <span style="font-size:9px;font-weight:700;color:${sec==='gov'?'#1a3a8a':'#5b3a8a'};background:${sec==='gov'?'#e8f0ff':'#f0e8ff'};padding:1px 3px;border-radius:3px;text-align:center">${sec.toUpperCase()}</span>
+          ${SEGS.map(sg=>`<input class="alloc-hcp-inp" type="number" min="0" value="${a[sec][sg]||0}" oninput="setRHcp(${r.id},'${p.id}','${sec}','${sg}',this.value)">`).join('')}
+        </div>`).join('')}
+      </div>`
+    }).join('');
+    div.innerHTML=`<div class="rep-head"><input class="rep-name-inp" value="${r.name}" placeholder="Rep name" oninput="reps.find(r=>r.id===${r.id}).name=this.value;markDirty()"><button class="rm-btn" onclick="removeRep(${r.id})">✕</button></div>
+      <div class="rep-body">${aRows||'<div style="font-family:var(--mono);font-size:10px;color:var(--tx3)">No products defined.</div>'}</div>`;
+    el.appendChild(div)
+  })
+}
+
+function runTeamSim(){
+  if(!reps.length){alert('Add at least one rep.');return}
+  if(!teamProds.length){alert('Add at least one product.');return}
+  const period=+document.getElementById('t-period').value;
+  const days=+document.getElementById('t-days').value*period*2;
+  const cpd=+document.getElementById('t-cpd').value;
+  const cap=days*cpd;
+  const pLbl=period===0.5?'Half Year':'Full Year';
+
+  const repData=reps.map(r=>{
+    let gc=0,pc=0,tHcp=0;
+    const byProd={};
+    r.allocs.forEach(a=>{
+      const prod=teamProds.find(p=>p.id===a.prodId);if(!prod)return;
+      const gcP=SEGS.reduce((s,sg)=>s+(a.gov[sg]||0)*(prod.freq.gov[sg]||0),0);
+      const pcP=SEGS.reduce((s,sg)=>s+(a.pvt[sg]||0)*(prod.freq.pvt[sg]||0),0);
+      const govH=SEGS.reduce((s,sg)=>s+(a.gov[sg]||0),0);
+      const pvtH=SEGS.reduce((s,sg)=>s+(a.pvt[sg]||0),0);
+      gc+=gcP;pc+=pcP;tHcp+=govH+pvtH;
+      const sgGov={},sgPvt={};
+      SEGS.forEach(sg=>{sgGov[sg]=a.gov[sg]||0;sgPvt[sg]=a.pvt[sg]||0});
+      byProd[a.prodId]={calls:gcP+pcP,govCalls:gcP,pvtCalls:pcP,hcps:govH+pvtH,govHcps:govH,pvtHcps:pvtH,sgGov,sgPvt}
+    });
+    const tc=gc+pc;
+    return{r,totalCalls:tc,totalHCPs:tHcp,govCalls:gc,pvtCalls:pc,util:tc/cap,byProd}
+  });
+
+  const tCap=cap*reps.length;
+  const tCalls=repData.reduce((s,d)=>s+d.totalCalls,0);
+  const tGov=repData.reduce((s,d)=>s+d.govCalls,0);
+  const tPvt=repData.reduce((s,d)=>s+d.pvtCalls,0);
+  const tUtil=tCalls/tCap;
+
+  // Prod totals
+  const pt={};
+  teamProds.forEach(p=>{pt[p.id]={calls:0,hcps:0,govCalls:0,pvtCalls:0,sgGov:{},sgPvt:{}};SEGS.forEach(s=>{pt[p.id].sgGov[s]=0;pt[p.id].sgPvt[s]=0})});
+  repData.forEach(d=>teamProds.forEach(p=>{const a=d.byProd[p.id];if(!a)return;pt[p.id].calls+=a.calls;pt[p.id].hcps+=a.hcps;pt[p.id].govCalls+=a.govCalls;pt[p.id].pvtCalls+=a.pvtCalls;SEGS.forEach(s=>{pt[p.id].sgGov[s]+=a.sgGov[s]||0;pt[p.id].sgPvt[s]+=a.sgPvt[s]||0})}));
+
+  function repTable(sec){
+    const rows=repData.map(d=>{
+      const calls=sec==='all'?d.totalCalls:sec==='gov'?d.govCalls:d.pvtCalls;
+      const u=calls/cap;
+      const stack=teamProds.map(p=>{const a=d.byProd[p.id];const c=a?sec==='all'?a.calls:sec==='gov'?a.govCalls:a.pvtCalls:0;const w=cap>0?(c/cap*100).toFixed(1):0;return`<div class="stack-seg" style="width:${w}%;background:${p.color}" title="${p.name||'—'}: ${fmt(c)}">${+w>6?fmt(c):''}</div>`}).join('');
+      return`<tr><td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td><td class="r">${fmt(d.totalHCPs)}</td><td class="r">${sec!=='pvt'?fmt(d.govCalls):'—'}</td><td class="r">${sec!=='gov'?fmt(d.pvtCalls):'—'}</td><td class="r">${fmt(calls)}</td><td class="r">${fmt(cap)}</td><td>${ubar(u)}</td><td>${sBadge(u)}</td></tr>`
+    }).join('');
+    const tC=sec==='all'?tCalls:sec==='gov'?tGov:tPvt;
+    return`<table><tr><th>Rep</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total</th><th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>${rows}<tr class="total"><td>TEAM</td><td class="r"></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC)}</td><td class="r">${fmt(tCap)}</td><td>${ubar(tC/tCap)}</td><td>${sBadge(tC/tCap)}</td></tr></table>`
+  }
+
+  // Segment ratio table per product — bold % with colors and arrows vs team
+  const segTables=teamProds.map(prod=>{
+    // compute team averages first
+    const teamAvg={};
+    SEGS.forEach(sg=>{
+      const t=(pt[prod.id].sgGov[sg]||0)+(pt[prod.id].sgPvt[sg]||0);
+      teamAvg[sg]=pt[prod.id].hcps>0?t/pt[prod.id].hcps*100:0;
+    });
+    const tableRows=repData.map(d=>{
+      const a=d.byProd[prod.id];if(!a)return'';
+      const cells=SEGS.map(sg=>{
+        const g=a.sgGov[sg]||0,v=a.sgPvt[sg]||0,t=g+v;
+        const pct=a.hcps>0?t/a.hcps*100:0;
+        const diff=pct-teamAvg[sg];
+        const arrow=Math.abs(diff)>=10?(diff>0?'<span style="color:#c0392b;font-size:10px">▲</span>':'<span style="color:#1a8a5c;font-size:10px">▼</span>'):'';
+        const col=SEG_COLORS[sg];
+        const bg=t===0?'#f9fbf9':`${col}12`;
+        return`<td style="text-align:center;padding:6px 4px;background:${bg}">
+          <div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%${arrow}</div>
+          <div style="font-size:9px;font-family:var(--mono);color:var(--tx3);margin-top:1px"><span style="color:#1a3a8a">${g}</span>/<span style="color:#5b3a8a">${v}</span></div>
+        </td>`;
+      }).join('');
+      return`<tr><td style="font-weight:700;font-size:12px">${d.r.name||'Rep'}</td>${cells}<td class="r" style="font-weight:700">${fmt(a.hcps)}</td></tr>`
+    }).join('');
+    const tRow=`<tr class="total"><td>TEAM</td>${SEGS.map(sg=>{
+      const t=(pt[prod.id].sgGov[sg]||0)+(pt[prod.id].sgPvt[sg]||0);
+      const pct=pt[prod.id].hcps>0?t/pt[prod.id].hcps*100:0;
+      const col=SEG_COLORS[sg];
+      return`<td style="text-align:center;background:${col}18"><div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%</div><div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${fmt(t)} HCPs</div></td>`;
+    }).join('')}<td class="r">${fmt(pt[prod.id].hcps)}</td></tr>`;
+    return`<div class="tcard"><div class="tcard-head">
+        <div class="tcard-title" style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:${prod.color};border-radius:50%;display:inline-block"></span>${prod.name||'Product'} — CVM Segment % by Rep</div>
+        <div class="tcard-sub">▲=10pp+ above team avg · ▼=10pp+ below · G=Gov · P=Pvt</div>
+      </div>
+      <table><tr><th>Rep</th>${SEGS.map(s=>`<th style="text-align:center;color:${SEG_COLORS[s]};font-weight:700">${s}</th>`).join('')}<th class="r">Total HCPs</th></tr>${tableRows}${tRow}</table>
+    </div>`
+  }).join('');
+
+  const ins=[];
+  const mx=Math.max(...repData.map(d=>d.totalCalls)),mn=Math.min(...repData.map(d=>d.totalCalls));
+  const imb=mn>0?mx/mn:Infinity;
+  if(imb>1.4){const bsy=repData.find(d=>d.totalCalls===mx),lgt=repData.find(d=>d.totalCalls===mn);ins.push({cls:'warn',t:`Territory Imbalance: ${imb.toFixed(1)}× ratio. ${bsy.r.name||'Busiest'} carries ${fmt(mx)} vs ${fmt(mn)} for ${lgt.r.name||'lightest'}. Rebalance HCP assignments.`})}
+  if(tUtil>0.9)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% — near ceiling. Any new product launch without frequency reduction will overrun.`});
+  const govS=tGov/tCalls,pvtS=tPvt/tCalls;
+  ins.push({cls:'',t:`Gov ${(govS*100).toFixed(0)}% · Private ${(pvtS*100).toFixed(0)}%. ${govS>.88?'Heavy gov — check private coverage for launch products.':pvtS>.55?'Private-skewed — verify HA relationships maintained.':'Balanced.'}`});
+  const over=repData.filter(d=>d.util>1);if(over.length)ins.push({cls:'crit',t:`${over.map(d=>d.r.name||'Rep').join(', ')} over capacity. Redistribute HCPs.`});
+
+  saveCurrentScenState();
+  S().teamResult={teamUtil:tUtil,tCalls,tCap,pLbl,ts:new Date().toISOString()};
+
+  document.getElementById('team-results').innerHTML=`
+    <div>
+      <div class="results-head">
+        <div><div class="results-title">Team Capacity Analysis</div>
+          <div class="results-sub">${reps.length} reps · ${teamProds.length} products · ${pLbl}</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="showExportModal()">⬇ Save / Export</button>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-lbl">Team Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(tCap)}</div><div class="kpi-sub">${fmt(cap)} / rep</div></div>
+        <div class="kpi"><div class="kpi-lbl">Utilisation</div><div class="kpi-val" style="color:${barCol(tUtil)}">${(tUtil*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(tUtil)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Gov Calls</div><div class="kpi-val" style="color:#1a3a8a">${fmt(tGov)}</div><div class="kpi-sub">${(tGov/tCalls*100).toFixed(0)}% of total</div></div>
+        <div class="kpi"><div class="kpi-lbl">Private Calls</div><div class="kpi-val" style="color:#5b3a8a">${fmt(tPvt)}</div><div class="kpi-sub">${(tPvt/tCalls*100).toFixed(0)}% of total</div></div>
+      </div>
+      <div class="insight-box"><div class="insight-title">◈ Team Insights</div>
+        ${ins.map(i=>`<div class="insight-item ${i.cls}"><span class="ia">→</span><span>${i.t}</span></div>`).join('')}
+      </div>
+      <div class="tcard">
+        <div class="tcard-head"><div class="tcard-title">Rep Capacity by Sector</div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" id="ft-all" onclick="fSec('all')">All</button>
+            <button class="filter-tab" id="ft-gov" onclick="fSec('gov')">🏛 Gov</button>
+            <button class="filter-tab" id="ft-pvt" onclick="fSec('pvt')">🏥 Private</button>
+          </div></div>
+        <div id="rep-tbl">${repTable('all')}</div>
+      </div>
+      ${segTables}
+    </div>`;
+  window._repTable=repTable
+}
+
+function fSec(s){
+  document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ft-'+s).classList.add('active');
+  if(window._repTable)document.getElementById('rep-tbl').innerHTML=window._repTable(s)
+}
+
+function loadTeamDemo(){
+  reps.length=0;repIdC=0;teamProds.length=0;
+  addTeamProd({name:'Ofev',freq:{gov:{Gain:18,Build:28,Defend:25,Maintain:7,Observe:2},pvt:{Gain:10,Build:20,Defend:18,Maintain:5,Observe:2}}});
+  addTeamProd({name:'Hernexeos',freq:{gov:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2},pvt:{Gain:6,Build:6,Defend:6,Maintain:4,Observe:2}}});
+  addTeamProd({name:'Jascayd',freq:{gov:{Gain:4,Build:6,Defend:6,Maintain:3,Observe:2},pvt:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2}}});
+  const ids=teamProds.map(p=>p.id);
+  addRep({name:'Ming (SC_1)',gov:{[ids[0]]:{Gain:60,Build:75,Defend:8,Maintain:1,Observe:0},[ids[1]]:{Gain:30,Build:0,Defend:0,Maintain:25,Observe:7},[ids[2]]:{Gain:15,Build:0,Defend:0,Maintain:0,Observe:0}},pvt:{[ids[0]]:{Gain:0,Build:0,Defend:0,Maintain:10,Observe:0},[ids[1]]:{Gain:3,Build:0,Defend:0,Maintain:0,Observe:0},[ids[2]]:{Gain:10,Build:0,Defend:0,Maintain:0,Observe:0}}});
+  addRep({name:'William (SC_2)',gov:{[ids[0]]:{Gain:40,Build:75,Defend:0,Maintain:0,Observe:0},[ids[1]]:{Gain:47,Build:0,Defend:0,Maintain:35,Observe:8},[ids[2]]:{Gain:5,Build:0,Defend:0,Maintain:0,Observe:0}},pvt:{[ids[0]]:{Gain:0,Build:0,Defend:0,Maintain:8,Observe:13},[ids[1]]:{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0},[ids[2]]:{Gain:16,Build:0,Defend:0,Maintain:0,Observe:0}}});
+  addRep({name:'Christine (SC_3)',gov:{[ids[0]]:{Gain:32,Build:0,Defend:8,Maintain:0,Observe:0},[ids[1]]:{Gain:0,Build:0,Defend:0,Maintain:16,Observe:38},[ids[2]]:{Gain:5,Build:0,Defend:0,Maintain:0,Observe:0}},pvt:{[ids[0]]:{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0},[ids[1]]:{Gain:4,Build:0,Defend:0,Maintain:0,Observe:0},[ids[2]]:{Gain:10,Build:0,Defend:0,Maintain:0,Observe:0}}});
+  addRep({name:'Zoie (SC_4)',gov:{[ids[0]]:{Gain:20,Build:0,Defend:0,Maintain:0,Observe:0},[ids[1]]:{Gain:0,Build:0,Defend:0,Maintain:16,Observe:39},[ids[2]]:{Gain:5,Build:0,Defend:0,Maintain:0,Observe:0}},pvt:{[ids[0]]:{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0},[ids[1]]:{Gain:3,Build:0,Defend:0,Maintain:0,Observe:0},[ids[2]]:{Gain:10,Build:0,Defend:0,Maintain:0,Observe:0}}});
+  renderTeamProdRef();renderRepList()
+}
+
+function renderCompare(){
+  const withResults=scenarios.filter(s=>s.savedResult);
+  if(withResults.length<1){document.getElementById('compare-results').innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-t">Run Simulations First</div><div class="empty-s">Run Product Simulation in at least one scenario, then compare here</div></div>';return}
+  const cols=withResults.map(s=>{
+    const r=s.savedResult;
+    const first=r.periodResults[0];
+    const last=r.periodResults[r.periodResults.length-1];
+    const trend=last.util-first.util;
+    return`<div class="compare-card">
+      <div class="compare-head"><div style="font-weight:700;font-size:13px;color:var(--tx)">${s.name}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--tx3)">${r.repsN} reps · ${r.prods?.length||0} products · ${new Date(r.ts).toLocaleDateString()}</div>
+      </div>
+      <div class="compare-metric"><span style="color:var(--tx2)">Periods</span><span style="font-family:var(--mono);font-weight:700">${r.periods?.length||0}</span></div>
+      <div class="compare-metric"><span style="color:var(--tx2)">First period util</span><span style="font-family:var(--mono);font-weight:700;color:${barCol(first.util)}">${(first.util*100).toFixed(1)}%</span></div>
+      <div class="compare-metric"><span style="color:var(--tx2)">Last period util</span><span style="font-family:var(--mono);font-weight:700;color:${barCol(last.util)}">${(last.util*100).toFixed(1)}%</span></div>
+      <div class="compare-metric"><span style="color:var(--tx2)">Utilisation trend</span><span style="font-family:var(--mono);font-weight:700;color:${trend>0?'#c0392b':trend<0?'#1a8a5c':'var(--tx)'}">${trend>0?'↑ Increasing':'↓ Decreasing'} (${Math.abs(trend*100).toFixed(1)}pp)</span></div>
+      <div class="compare-metric"><span style="color:var(--tx2)">Gov / Pvt split</span><span style="font-family:var(--mono);font-size:10px">${first.totalCalls>0?(first.govCalls/first.totalCalls*100).toFixed(0):0}% / ${first.totalCalls>0?(first.pvtCalls/first.totalCalls*100).toFixed(0):0}%</span></div>
+      <div style="padding:8px 14px;border-top:1px solid var(--bdr)">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--tx3);margin-bottom:5px">PERIOD UTILISATION</div>
+        ${r.periodResults.map(pr=>`<div class="compare-metric" style="padding:4px 0"><span style="color:var(--tx3);font-size:11px">${pr.per.label}</span><span>${ubar(pr.util)}</span></div>`).join('')}
+      </div>
+    </div>`
+  }).join('');
+  document.getElementById('compare-results').innerHTML=`
+    <div>
+      <div class="results-head"><div><div class="results-title">Scenario Comparison</div>
+        <div class="results-sub">${withResults.length} scenario(s) with results · Clone a scenario in Product Simulation to stress-test assumptions</div></div></div>
+      <div class="compare-grid">${cols}</div>
+      <div class="insight-box" style="margin-top:4px"><div class="insight-title">💡 How to Use Scenario Comparison</div>
+        <div class="insight-item"><span class="ia">1</span><span>In Product Simulation, configure your baseline (e.g. 2026 plan with Ofev + Hernexeos).</span></div>
+        <div class="insight-item"><span class="ia">2</span><span>Click <strong>⎘ Clone</strong> to duplicate. In the clone, add Jascayd or change rep count. Run simulation.</span></div>
+        <div class="insight-item"><span class="ia">3</span><span>Return here to compare utilisation trend, sector split, and capacity across both plans side by side.</span></div>
+        <div class="insight-item"><span class="ia">4</span><span>Use <strong>⬇ Save / Export</strong> to download each scenario as JSON (reload later) or CSV (share in Excel).</span></div>
+      </div>
+    </div>`
+}
+
+renderScenChips();
+renderPeriodTabs();
+renderProdList();
+renderTeamProdRef();
+renderRepList();
+</script>
+
+<footer>
+  <span style="font-size:10px;color:var(--tx3)">Designed by AP &nbsp;·&nbsp; BIHK GTM Planning Tool &nbsp;·&nbsp; For Internal Use Only</span>
+  <span style="font-size:10px;color:var(--bdr2)">v3.0.0 &nbsp;·&nbsp; Last updated: May 2026</span>
+</footer>
+</body>
+</html>
