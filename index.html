@@ -557,45 +557,134 @@ function exportPDF(){
     try{return Array.from(ss.cssRules).map(r=>r.cssText).join('\n')}catch{return''}
   }).join('\n');
   const content=mainArea.innerHTML;
-  // Build settings summary for PDF
+  // Build comprehensive settings summary for PDF
   const s=S();
   const activeMod=document.querySelector('.shell.active')?.id||'';
   const isTeam=activeMod==='shell-team';
-  let settingsRows='';
+  const SEGS_PDF=['Gain','Build','Defend','Maintain','Observe'];
+  const SEG_C={Gain:'#c87a00',Build:'#3b7fd4',Defend:'#1a8a5c',Maintain:'#7c52c8',Observe:'#5a6a85'};
+
+  // Shared helpers
+  const secHdr=(lbl,col)=>`<span style="font-size:7.5pt;font-weight:700;color:${col};background:${col}18;padding:1px 5px;border-radius:3px">${lbl}</span>`;
+  const segHdrs=()=>SEGS_PDF.map(s=>`<th style="text-align:center;color:${SEG_C[s]};font-size:7pt;padding:3px 4px">${s.substring(0,3)}</th>`).join('');
+  const segVals=(obj)=>SEGS_PDF.map(sg=>`<td style="text-align:center;font-size:8pt;padding:3px 4px">${obj?.(sg)??0}</td>`).join('');
+
+  // Card wrapper
+  const card=(title,inner)=>`<div style="background:#fff;border:1.5px solid #c8d8c8;border-radius:7px;overflow:hidden;margin-bottom:10px;break-inside:avoid">
+    <div style="background:#1a5c38;padding:6px 12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:8pt;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.8px">${title}</span></div>
+    <div style="padding:8px 12px">${inner}</div>
+  </div>`;
+
+  const tbl=(hdrs,rows)=>`<table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
+    <thead><tr style="background:#e8f0e8">${hdrs}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+
+  let settingsBlock='';
+
   if(!isTeam){
-    // Product simulation settings
+    // ── PRODUCT SIMULATION ────────────────────────────────────────
     const pReps=document.getElementById('p-reps')?.value||'—';
     const pCpd=document.getElementById('p-cpd')?.value||'—';
     const pDays=document.getElementById('p-days')?.value||'—';
     const pTeam=document.getElementById('p-team')?.value||'—';
-    const perLabels=(s.periods||[]).map(p=>p.label+' ('+p.halfYears+'H)').join(', ')||'—';
-    settingsRows=`
-      <tr><td>TA Team</td><td>${pTeam}</td><td>No. of Reps</td><td>${pReps}</td></tr>
-      <tr><td>Calls / Day</td><td>${pCpd}</td><td>Working Days</td><td>${pDays}</td></tr>
-      <tr><td>Planning Periods</td><td colspan="3">${perLabels}</td></tr>
-      <tr><td>Products</td><td colspan="3">${(s.prods||[]).map(p=>(p.name||'—')+' ('+((p.phase||'').charAt(0).toUpperCase()+(p.phase||'').slice(1))+')').join(' · ')||'—'}</td></tr>`;
+    const perLabels=(s.periods||[]).map(p=>`${p.label} (${p.halfYears}H)`).join(' · ')||'—';
+
+    // Overview card
+    const overviewCard=card('Simulation Overview',
+      `<table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:9pt">
+        <colgroup><col style="width:20%"><col style="width:30%"><col style="width:20%"><col style="width:30%"></colgroup>
+        <tr style="border-bottom:1px solid #e8f0e8"><td style="padding:4px 6px;color:#5a8a6a">TA Team</td><td style="padding:4px 6px;font-weight:700">${pTeam}</td><td style="padding:4px 6px;color:#5a8a6a">Reps</td><td style="padding:4px 6px;font-weight:700">${pReps}</td></tr>
+        <tr style="border-bottom:1px solid #e8f0e8"><td style="padding:4px 6px;color:#5a8a6a">Calls/Day</td><td style="padding:4px 6px;font-weight:700">${pCpd}</td><td style="padding:4px 6px;color:#5a8a6a">Working Days</td><td style="padding:4px 6px;font-weight:700">${pDays}</td></tr>
+        <tr><td style="padding:4px 6px;color:#5a8a6a">Periods</td><td colspan="3" style="padding:4px 6px;font-weight:700">${perLabels}</td></tr>
+      </table>`
+    );
+
+    // Per-product detail cards
+    const prodCards=(s.prods||[]).map(p=>{
+      const phaseLabel=(p.phase||'').charAt(0).toUpperCase()+(p.phase||'').slice(1);
+      const dot=`<span style="display:inline-block;width:9px;height:9px;background:${p.color||'#1a5c38'};border-radius:50%;margin-right:5px;vertical-align:middle"></span>`;
+
+      // HCP table
+      const hcpRows=['gov','pvt'].map(sec=>{
+        const sLabel=sec==='gov'?secHdr('GOV','#1a3a8a'):secHdr('PVT','#5b3a8a');
+        return `<tr style="border-bottom:1px solid #eaf0ea"><td style="padding:3px 8px">${sLabel}</td>${segVals(sg=>p.hcps?.[sec]?.[sg]??0)}</tr>`;
+      }).join('');
+      const hcpTable=tbl(`<th style="padding:3px 8px;font-size:7.5pt;color:#5a8a6a">Sector</th>${segHdrs()}`, hcpRows);
+
+      // Freq table
+      const freqRows=['gov','pvt'].map(sec=>{
+        const sLabel=sec==='gov'?secHdr('GOV','#1a3a8a'):secHdr('PVT','#5b3a8a');
+        return `<tr style="border-bottom:1px solid #eaf0ea"><td style="padding:3px 8px">${sLabel}</td>${segVals(sg=>p.freq?.[sec]?.[sg]??0)}</tr>`;
+      }).join('');
+      const freqTable=tbl(`<th style="padding:3px 8px;font-size:7.5pt;color:#5a8a6a">Sector</th>${segHdrs()}`, freqRows);
+
+      return card(`${dot}${p.name||'Product'} &nbsp;<span style="font-size:7.5pt;opacity:.7">${phaseLabel}</span>`,
+        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:7.5pt;font-weight:700;color:#5a8a6a;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">HCPs by Segment &amp; Sector</div>
+            ${hcpTable}
+          </div>
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:7.5pt;font-weight:700;color:#5a8a6a;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Call Freq / Cycle by Sector</div>
+            ${freqTable}
+          </div>
+        </div>`
+      );
+    }).join('');
+
+    settingsBlock=`<div style="margin-bottom:16px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid #1a5c38">Input Settings — Product Simulation</div>
+      ${overviewCard}${prodCards}
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin:14px 0 10px;padding-bottom:5px;border-bottom:2px solid #1a5c38">Simulation Results</div>
+    </div>`;
+
   } else {
-    // Team capacity settings
+    // ── TEAM CAPACITY ─────────────────────────────────────────────
     const tDays=document.getElementById('t-days')?.value||'—';
     const tCpd=document.getElementById('t-cpd')?.value||'—';
     const tPeriod=document.getElementById('t-period')?.value==='0.5'?'Half Year':'Full Year';
-    const repNames=(s.reps||[]).map(r=>r.name||'Rep').join(', ')||'—';
-    const prodNames=(s.teamProds||[]).map(p=>p.name||'—').join(', ')||'—';
-    settingsRows=`
-      <tr><td>Planning Period</td><td>${tPeriod}</td><td>Working Days</td><td>${tDays}</td></tr>
-      <tr><td>Calls / Day</td><td>${tCpd}</td><td>No. of Reps</td><td>${(s.reps||[]).length}</td></tr>
-      <tr><td>Products</td><td colspan="3">${prodNames}</td></tr>
-      <tr><td>Field Force</td><td colspan="3">${repNames}</td></tr>`;
+
+    // Overview card
+    const overviewCard=card('Team Settings',
+      `<table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:9pt">
+        <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+        <tr style="border-bottom:1px solid #e8f0e8"><td style="padding:4px 6px;color:#5a8a6a">Period</td><td style="padding:4px 6px;font-weight:700">${tPeriod}</td><td style="padding:4px 6px;color:#5a8a6a">Working Days</td><td style="padding:4px 6px;font-weight:700">${tDays}</td></tr>
+        <tr><td style="padding:4px 6px;color:#5a8a6a">Calls/Day</td><td style="padding:4px 6px;font-weight:700">${tCpd}</td><td style="padding:4px 6px;color:#5a8a6a">No. of Reps</td><td style="padding:4px 6px;font-weight:700">${(s.reps||[]).length}</td></tr>
+      </table>`
+    );
+
+    // Product + freq card per product
+    const prodFreqCards=(s.teamProds||[]).map(p=>{
+      const dot=`<span style="display:inline-block;width:9px;height:9px;background:${p.color||'#1a5c38'};border-radius:50%;margin-right:5px;vertical-align:middle"></span>`;
+      const freqRows=['gov','pvt'].map(sec=>{
+        const sLabel=sec==='gov'?secHdr('GOV','#1a3a8a'):secHdr('PVT','#5b3a8a');
+        return `<tr style="border-bottom:1px solid #eaf0ea"><td style="padding:3px 8px">${sLabel}</td>${segVals(sg=>p.freq?.[sec]?.[sg]??0)}</tr>`;
+      }).join('');
+      const freqTable=tbl(`<th style="padding:3px 8px;font-size:7.5pt;color:#5a8a6a">Sector</th>${segHdrs()}`, freqRows);
+      return card(`${dot}${p.name||'Product'} — Call Freq / Cycle`, freqTable);
+    }).join('');
+
+    // Field force HCP cards — one card per rep
+    const repCards=(s.reps||[]).map(r=>{
+      const repRows=(s.teamProds||[]).map(p=>{
+        const alloc=r.allocs?.find(a=>a.prodId===p.id);
+        const dot=`<span style="display:inline-block;width:7px;height:7px;background:${p.color||'#1a5c38'};border-radius:50%;margin-right:4px;vertical-align:middle"></span>`;
+        const govRow=`<tr style="border-bottom:1px solid #f0f5f0"><td style="padding:2px 6px">${dot}${p.name||'—'} ${secHdr('GOV','#1a3a8a')}</td>${segVals(sg=>alloc?.gov?.[sg]??0)}</tr>`;
+        const pvtRow=`<tr style="border-bottom:1px solid #eaf0ea"><td style="padding:2px 6px">${dot}${p.name||'—'} ${secHdr('PVT','#5b3a8a')}</td>${segVals(sg=>alloc?.pvt?.[sg]??0)}</tr>`;
+        return govRow+pvtRow;
+      }).join('');
+      return card(`${r.name||'Rep'} — HCPs by Segment &amp; Sector`,
+        tbl(`<th style="padding:3px 8px;font-size:7.5pt;color:#5a8a6a">Product / Sector</th>${segHdrs()}`, repRows)
+      );
+    }).join('');
+
+    settingsBlock=`<div style="margin-bottom:16px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid #1a5c38">Input Settings — Team Capacity</div>
+      ${overviewCard}${prodFreqCards}${repCards}
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin:14px 0 10px;padding-bottom:5px;border-bottom:2px solid #1a5c38">Simulation Results</div>
+    </div>`;
   }
-  const settingsBlock=`<div style="background:#f4f7f4;border:1.5px solid #c8d8c8;border-radius:7px;padding:10px 14px;margin-bottom:14px;break-inside:avoid">
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a5c38;margin-bottom:8px">Simulation Settings</div>
-    <table style="width:100%;border-collapse:collapse;font-size:9pt">
-      <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
-      <tbody style="font-family:'IBM Plex Mono',monospace">
-        ${settingsRows}
-      </tbody>
-    </table>
-  </div>`;
 
   const win=window.open('','_blank','width=900,height=700');
   if(!win){alert('Pop-up blocked. Please allow pop-ups for this site and try again.');return;}
