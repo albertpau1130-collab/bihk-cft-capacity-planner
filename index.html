@@ -874,11 +874,10 @@ function renderPeriodTabs(){
         <option value="2"${p.half===2?' selected':''}>2H</option>
       </select>
       <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:3px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">×</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Cycles:</span>
         <input type="number" min="1" max="4" value="${p.halfYears}"
-          style="width:32px;padding:4px;text-align:center;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
-          onclick="event.stopPropagation()" oninput="updatePeriod('${p.id}','halfYears',+this.value)" title="No. of half-year cycles">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">H</span>
+          style="width:36px;padding:4px;text-align:center;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
+          onclick="event.stopPropagation()" oninput="updatePeriod('${p.id}','halfYears',+this.value)" title="No. of half-year cycles in this period">
       </div>
       <button onclick="event.stopPropagation();removePeriod('${p.id}')"
         style="padding:2px 7px;border:1px solid #fca5a5;border-radius:4px;background:transparent;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
@@ -996,12 +995,12 @@ function renderProdList(){
         ${freqRows}
         <div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--bdr)">
           <div style="font-family:var(--mono);font-size:9px;color:var(--amb);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Adjusted Total Calls (optional)</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input class="seg-inp" type="number" min="0" placeholder="e.g. 800"
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <input class="inp" type="number" min="0" placeholder="e.g. 1200 — enter adjusted call target per cycle"
               value="${p.adjCalls??''}"
-              style="width:110px;padding:5px 8px;font-size:12px;border-color:${p.adjCalls!=null?'var(--amb)':'var(--bdr)'}"
+              style="width:100%;border-color:${p.adjCalls!=null?'var(--amb)':'var(--bdr)'};border-width:2px;font-size:13px;font-family:var(--mono)"
               oninput="setProdField(${p.id},'adjCalls',this.value===''?null:+this.value)">
-            <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);line-height:1.4">Override planned calls with rep-adjusted actual target per cycle. Leave blank to use HCP × freq calculation.</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);line-height:1.5">Enter the realistic call target after accounting for access difficulty and rep judgment. Leave blank to use HCP × freq. The comparison between Planned and Adjusted helps assess whether call frequency norms should be revised.</span>
           </div>
         </div>
       </div>`;
@@ -1050,12 +1049,12 @@ function runProdSim(){
     return`<div class="tl-period${activePeriodId===r.per.id?' active':''}" onclick="activatePeriod('${r.per.id}')">
       <div class="tl-period-name">${r.per.label}</div>
       <div class="tl-period-sub">${r.per.halfYears}H · ${repsN} reps</div>
-      <div style="font-family:var(--mono);font-size:8px;color:var(--tx3);margin-top:4px">Planned</div>
-      <div class="tl-util"><div class="tl-util-fill" style="width:${pct}%;background:${c}"></div></div>
-      <div class="tl-util-pct" style="color:${c}">${(r.util*100).toFixed(1)}% ${sBadge(r.util)}</div>
-      ${adjPct!=null?`<div style="font-family:var(--mono);font-size:8px;color:var(--amb);margin-top:4px">Adjusted</div>
-      <div class="tl-util"><div class="tl-util-fill" style="width:${adjPct}%;background:${adjC}"></div></div>
-      <div class="tl-util-pct" style="color:${adjC}">${(r.adjUtil*100).toFixed(1)}% ${sBadge(r.adjUtil)}</div>`:''}
+      <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--tx2);margin-top:6px;letter-spacing:.3px">Planned <span style="font-weight:400;color:var(--tx3)">(HCP × Freq)</span></div>
+      <div class="tl-util" style="margin-top:3px;height:7px"><div class="tl-util-fill" style="width:${pct}%;background:${c};height:7px"></div></div>
+      <div class="tl-util-pct" style="color:${c};font-size:11px;font-weight:700;margin-top:2px">${(r.util*100).toFixed(1)}% ${sBadge(r.util)}</div>
+      ${adjPct!=null?`<div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amb);margin-top:8px;letter-spacing:.3px">Adjusted <span style="font-weight:400;color:#b45309">(Rep-adjusted target)</span></div>
+      <div class="tl-util" style="margin-top:3px;height:7px;background:#fef3c7"><div class="tl-util-fill" style="width:${adjPct}%;background:${adjC};height:7px"></div></div>
+      <div class="tl-util-pct" style="color:${adjC};font-size:11px;font-weight:700;margin-top:2px">${(r.adjUtil*100).toFixed(1)}% ${sBadge(r.adjUtil)}</div>`:''}
     </div>`
   }).join('');
 
@@ -1064,27 +1063,41 @@ function runProdSim(){
 
   // Product rows
   const showAdj=actR.byProd.some(b=>b.adjCalls!=null);
+  // Dual-bar helper (used in product rows and total row)
+  const dualBar=(planned,adj,cap)=>{
+    const pp=cap>0?Math.min(planned/cap*100,100):0;
+    const ap=adj!=null&&cap>0?Math.min(adj/cap*100,100):null;
+    const pc=barCol(planned/cap);
+    return`<div>
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+        <div style="flex:1;height:5px;background:#d4e6d4;border-radius:3px;overflow:hidden;min-width:50px">
+          <div style="height:100%;width:${pp}%;background:${pc};border-radius:3px"></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${pc};min-width:36px;text-align:right">${(planned/cap*100).toFixed(1)}%</div>
+      </div>
+      ${ap!=null?`<div style="display:flex;align-items:center;gap:5px">
+        <div style="flex:1;height:5px;background:#fef3c7;border-radius:3px;overflow:hidden;min-width:50px">
+          <div style="height:100%;width:${ap}%;background:var(--amb);border-radius:3px"></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amb);min-width:36px;text-align:right">${(adj/cap*100).toFixed(1)}%</div>
+      </div>`:''}
+    </div>`;
+  };
   const prodRows=actR.byProd.map(({p,calls,adjCalls,govCalls,pvtCalls,hcps})=>{
     const cfg=PHASE_CFG[p.phase];
-    const achPct=adjCalls!=null&&calls>0?(adjCalls/calls*100).toFixed(0):null;
-    const achCol=achPct!=null?(+achPct>=90?'#1a8a5c':+achPct>=75?'#b45309':'#c0392b'):'';
-    const adjCell=showAdj?(adjCalls!=null
-      ?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(adjCalls)}</td><td class="r"><span style="font-weight:700;color:${achCol}">${achPct}%</span></td>`
-      :`<td class="r" style="color:var(--tx3)">—</td><td class="r">—</td>`):'';
     return`<tr>
       <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${p.color};border-radius:50%;display:inline-block"></span><strong>${p.name||'—'}</strong></span></td>
       <td><span class="badge" style="background:${cfg.color}22;color:${cfg.color};border:1px solid ${cfg.color}44">${cfg.label}</span></td>
       <td class="r">${fmt(hcps)}</td>
       <td class="r">${fmt(govCalls)}</td>
       <td class="r">${fmt(pvtCalls)}</td>
-      <td class="r">${fmt(calls)}</td>
-      ${adjCell}
+      <td class="r">${fmt(calls)}${adjCalls!=null?`<div style="font-family:var(--mono);font-size:9px;color:var(--amb)">${fmt(adjCalls)} adj.</div>`:''}</td>
       <td class="r">${actR.totalCalls>0?(calls/actR.totalCalls*100).toFixed(1):0}%</td>
-      <td>${ubar(calls/actR.cap)}</td>
+      <td>${dualBar(calls,adjCalls,actR.cap)}</td>
     </tr>`
   }).join('');
-  const adjHeaderCols=showAdj?`<th class="r" style="color:var(--amb)">Adjusted</th><th class="r" style="color:var(--amb)">Achievement</th>`:'';
-  const adjTotalCells=showAdj?(actR.totalAdj!=null?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(actR.totalAdj)}</td><td class="r"><span style="font-weight:700;color:${actR.totalCalls>0&&actR.totalAdj/actR.totalCalls>=0.9?'#1a8a5c':actR.totalAdj/actR.totalCalls>=0.75?'#b45309':'#c0392b'}">${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}%</span></td>`:`<td class="r">—</td><td class="r">—</td>`):'';
+  // No achievement columns — adjusted is also a call target, not actual
+  // Use dual-bar in the "vs Capacity" column instead
 
   // CVM segment per product
   const segProdRows=prods.map(p=>{
@@ -1113,24 +1126,28 @@ function runProdSim(){
       </div>
       <div class="timeline">${tlHTML}</div>
       <div style="font-family:var(--mono);font-size:10px;color:var(--grn);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Details: ${actR.per.label} (${actR.per.halfYears} half-year cycle${actR.per.halfYears>1?'s':''})</div>
+      <div style="font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--grn)">Team Capacity Utilisation</div>
       <div class="kpi-row">
-        <div class="kpi"><div class="kpi-lbl">Team Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(actR.cap)}</div><div class="kpi-sub">${fmt(actR.capPerRep)} / rep</div></div>
-        <div class="kpi"><div class="kpi-lbl">Planned Calls</div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Available Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(actR.cap)}</div><div class="kpi-sub">${fmt(actR.capPerRep)} calls / rep</div></div>
+        <div class="kpi"><div class="kpi-lbl">Planned Calls <span style="font-weight:400;opacity:.7">(HCP × Freq)</span></div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
         <div class="kpi"><div class="kpi-lbl">Planned Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
         ${actR.adjUtil!=null
-          ?`<div class="kpi" style="border-color:var(--amb)"><div class="kpi-lbl" style="color:var(--amb)">Adjusted Utilisation</div><div class="kpi-val" style="color:${barCol(actR.adjUtil)}">${(actR.adjUtil*100).toFixed(1)}%</div><div class="kpi-sub" style="color:var(--amb)">Achievement: ${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}% of planned</div></div>`
-          :`<div class="kpi"><div class="kpi-lbl">Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over':'available'}</div></div>`
+          ?`<div class="kpi" style="border-color:var(--amb);border-width:2px"><div class="kpi-lbl" style="color:var(--amb)">Adjusted Utilisation <span style="font-weight:400;opacity:.8">(Rep-adjusted target)</span></div><div class="kpi-val" style="color:${barCol(actR.adjUtil)}">${(actR.adjUtil*100).toFixed(1)}%</div><div class="kpi-sub" style="color:var(--amb)">Adj. calls: ${fmt(actR.totalAdj)} · ${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}% of planned</div></div>`
+          :`<div class="kpi"><div class="kpi-lbl">Remaining Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over capacity':'available'}</div></div>`
         }
       </div>
       ${eg}
       ${showAdj?`<div style="background:#fffbf0;border:1.5px solid #e8d5a0;border-left:4px solid var(--amb);border-radius:7px;padding:9px 14px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:#6b4c10">
-        <strong>Adjusted calls entered.</strong> Achievement % = adjusted ÷ planned. Below 80% suggests call frequency norms may be unrealistic for this product — consider revising segment frequencies downward. Below 75% may indicate access difficulty or territory design issues.
+        <strong>Adjusted call targets entered.</strong> Both Planned (HCP × Freq) and Adjusted (rep-adjusted target) are shown. Where adjusted is significantly lower than planned, consider reviewing whether call frequency norms by segment should be revised downward to reflect realistic access.
       </div>`:''}
       <div class="tcard">
-        <div class="tcard-head"><div class="tcard-title">Call Volume by Product × Sector</div><div class="tcard-sub">${actR.per.label}${showAdj?' · Adjusted calls shown in amber':''}</div></div>
-        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned</th>${adjHeaderCols}<th class="r">Share</th><th>vs Capacity</th></tr>
+        <div class="tcard-head">
+          <div class="tcard-title">Call Volume by Product × Sector</div>
+          <div class="tcard-sub">${actR.per.label}${showAdj?' · Green bar = Planned · Amber bar = Adjusted':''}</div>
+        </div>
+        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">Green=Planned · Amber=Adjusted</div>':''}</th></tr>
           ${prodRows}
-          <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}</td>${adjTotalCells}<td class="r">100%</td><td>${ubar(actR.util)}</td></tr>
+          <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}${actR.totalAdj!=null?`<div style="font-family:var(--mono);font-size:9px;color:var(--amb)">${fmt(actR.totalAdj)} adj.</div>`:''}</td><td class="r">100%</td><td>${dualBar?dualBar(actR.totalCalls,actR.totalAdj,actR.cap):ubar(actR.util)}</td></tr>
         </table>
       </div>
       <div class="tcard">
@@ -1306,6 +1323,14 @@ function renderRepList(){
           <span style="font-size:9px;font-weight:700;color:${sec==='gov'?'#1a3a8a':'#5b3a8a'};background:${sec==='gov'?'#e8f0ff':'#f0e8ff'};padding:1px 3px;border-radius:3px;text-align:center">${sec.toUpperCase()}</span>
           ${SEGS.map(sg=>`<input class="alloc-hcp-inp" type="number" min="0" value="${a[sec][sg]||0}" oninput="setRHcp(${r.id},'${p.id}','${sec}','${sg}',this.value)">`).join('')}
         </div>`).join('')}
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding-top:5px;border-top:1px dashed var(--bdr)">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amb);white-space:nowrap;min-width:62px">Adj. Calls:</span>
+          <input type="number" min="0" placeholder="e.g. 450"
+            value="${a.adjCalls??''}"
+            style="flex:1;padding:4px 6px;border:1.5px solid ${a.adjCalls!=null?'var(--amb)':'var(--bdr)'};border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
+            oninput="setRepAdj(${r.id},'${p.id}',this.value===''?null:+this.value)">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--tx3)">per cycle</span>
+        </div>
       </div>`
     }).join('');
     div.innerHTML=`<div class="rep-head"><input class="rep-name-inp" value="${r.name}" placeholder="Rep name" oninput="reps.find(r=>r.id===${r.id}).name=this.value;markDirty()"><button class="rm-btn" onclick="removeRep(${r.id})">✕</button></div>
