@@ -414,7 +414,7 @@ function markDirty(){isDirty=true;renderScenChips()}
 // ═══════════════════════════════════════════
 function fmt(n,d=0){if(n===null||n===undefined||isNaN(n))return'—';return n.toLocaleString('en-HK',{minimumFractionDigits:d,maximumFractionDigits:d})}
 function barCol(u){if(u>1)return'#c0392b';if(u>.88)return'#b45309';if(u<.70)return'#b45309';return'#1a8a5c'}
-function sBadge(u){if(u>1)return'<span class="badge b-over">⚠ OVER</span>';if(u>.88)return'<span class="badge b-warn">⚡ TIGHT</span>';if(u<.70)return'<span class="badge b-warn">↓ UNDER</span>';return'<span class="badge b-ok">✓ OK</span>'}
+function sBadge(u){if(u>1)return'<span class="badge b-over">⚠ OVER</span>';if(u>.88)return'<span class="badge b-warn">⚡ TIGHT</span>';if(u<.70)return'<span class="badge b-warn">↓ UNDER-USED</span>';return'<span class="badge b-ok">✓ OK</span>'}
 function ubar(u){const p=Math.min(u*100,100),c=barCol(u);return`<div class="ubar"><div class="ubar-track"><div class="ubar-fill" style="width:${p}%;background:${c}"></div></div><div class="ubar-pct" style="color:${c}">${(u*100).toFixed(1)}%</div></div>`}
 
 // ═══════════════════════════════════════════
@@ -1142,7 +1142,7 @@ function runProdSim(){
       <div class="tcard">
         <div class="tcard-head">
           <div class="tcard-title">Call Volume by Product × Sector</div>
-          <div class="tcard-sub">${actR.per.label}${showAdj?' · O=Original (HCP×Freq) · A=Adjusted · bar colour: green=OK, amber=warn, red=over':''}</div>
+          <div class="tcard-sub">${actR.per.label}${showAdj?' · O=Original (HCP×Freq) · A=Adjusted · 🟢=OK (70–88%) · 🟡=Under (<70%) or Tight (>88%) · 🔴=Over capacity':''}</div>
         </div>
         <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">O=Original · A=Adjusted</div>':''}</th></tr>
           ${prodRows}
@@ -1161,22 +1161,49 @@ function runProdSim(){
 function buildExpertGuidance(actR,prods){
   const norms=[];
   const util=actR.util;
+  const adjUtil=actR.adjUtil;
+  const hasAdj=adjUtil!=null;
   const govShare=actR.govCalls/actR.totalCalls;
   const pvtShare=actR.pvtCalls/actR.totalCalls;
 
-  // Capacity
-  if(util>1)norms.push({icon:'🚨',label:'CRITICAL: Over Capacity',
-    text:`Team is ${((util-1)*100).toFixed(0)}% over capacity. Reduce Gain HCP targets, lower Gain call frequency (highest cost, lowest return segment), or negotiate additional headcount before finalising CTEP.`,
-    verdict:'crit',vtext:'OVER CAPACITY'});
-  else if(util>.9)norms.push({icon:'⚠️',label:'HIGH RISK: Near Capacity Ceiling',
-    text:`Team at ${(util*100).toFixed(1)}% — virtually no buffer. Adding any new product without reducing existing call plans will breach capacity. Review Gain call frequency across all products.`,
-    verdict:'warn',vtext:'HIGH RISK'});
-  else if(util<.65)norms.push({icon:'📉',label:'Under-Utilisation',
-    text:`Team at ${(util*100).toFixed(1)}%. Significant spare capacity. Consider expanding HCP target list, increasing Gain coverage for launch products, or redeploying rep time to medical education and speaker programmes.`,
-    verdict:'warn',vtext:'UNDER-SERVED'});
-  else norms.push({icon:'✅',label:'Capacity: Within Target Range',
-    text:`${(util*100).toFixed(1)}% utilisation with ${fmt(actR.cap-actR.totalCalls)} call buffer. A buffer of 10–25% is directionally recommended to accommodate non-consent, admin time, ad-hoc medical requests, and mid-cycle territory adjustments.`,
-    verdict:'ok',vtext:'ON TRACK'});
+  // Capacity — Original
+  if(util>1){
+    const suggestion=`To reduce original utilisation: (1) reduce call frequency for high-cost, low-return segments (especially Gain in mature products), (2) reduce the number of targeted HCPs in over-represented segments, or (3) discuss headcount with management before finalising CTEP.`;
+    norms.push({icon:'🚨',label:'Original Plan: Over Capacity',
+      text:`Original call plan (HCP × Freq) is ${((util-1)*100).toFixed(0)}% over team capacity. ${suggestion}`,
+      verdict:'crit',vtext:'OVER CAPACITY'});
+  } else if(util>.9){
+    norms.push({icon:'⚠️',label:'Original Plan: Near Capacity Ceiling',
+      text:`Original plan at ${(util*100).toFixed(1)}% — virtually no buffer. Any new product addition without reducing existing calls will breach capacity. Consider reducing call frequency for lower-value segments (Observe, Maintain) or deferring lower-priority Gain HCPs.`,
+      verdict:'warn',vtext:'HIGH RISK'});
+  } else if(util<.70){
+    norms.push({icon:'📉',label:'Original Plan: Under-Utilised',
+      text:`Original plan at ${(util*100).toFixed(1)}% — significant spare capacity (${fmt(actR.cap-actR.totalCalls)} calls unused). Options: add more targeted HCPs (especially in Gain for launch products), increase call frequency for key Build/Defend segments, or plan ahead for an upcoming product launch.`,
+      verdict:'warn',vtext:'UNDER-USED'});
+  } else {
+    norms.push({icon:'✅',label:'Original Plan: Within Target Range',
+      text:`Original plan at ${(util*100).toFixed(1)}% with ${fmt(actR.cap-actR.totalCalls)} call buffer. Directionally appropriate — a buffer of 10–25% accommodates admin, non-consent, and mid-cycle territory adjustments.`,
+      verdict:'ok',vtext:'ON TRACK'});
+  }
+
+  // Original vs Adjusted interpretation
+  if(hasAdj){
+    const diff=actR.totalCalls-actR.totalAdj;
+    const diffPct=actR.totalCalls>0?(diff/actR.totalCalls*100).toFixed(0):0;
+    if(+diffPct>20){
+      norms.push({icon:'📋',label:'Original vs Adjusted: Large Gap — Review Call Frequency Norms',
+        text:`Adjusted target is ${diffPct}% lower than original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). This gap suggests the current call frequency norms by segment may be set too high to be achievable in practice — possibly due to doctor access difficulty, HCP non-consent, or territory logistics. Action: review and lower the call frequency per segment (particularly for Gain or Observe) to make the original plan more realistic.`,
+        verdict:'warn',vtext:'REVISE FREQ NORMS'});
+    } else if(+diffPct>0&&+diffPct<=20){
+      norms.push({icon:'📋',label:'Original vs Adjusted: Minor Gap — Manageable',
+        text:`Adjusted target is ${diffPct}% below original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). A small gap is expected and normal — reps adjust for access difficulty and non-consent. No immediate change to frequency norms is required, but monitor over time.`,
+        verdict:'ok',vtext:'ACCEPTABLE GAP'});
+    } else if(+diffPct<0){
+      norms.push({icon:'📋',label:'Original vs Adjusted: Adjusted Exceeds Original',
+        text:`Adjusted target (${fmt(actR.totalAdj)}) is higher than original (${fmt(actR.totalCalls)}). Verify this is intentional — if reps plan to call more than the HCP × Freq formula suggests, ensure capacity is sufficient and that the additional calls are strategic rather than unfocused detailing.`,
+        verdict:'warn',vtext:'REVIEW UPSIDE'});
+    }
+  }
 
   // Phase mix advice
   const launches=prods.filter(p=>p.phase==='launch');
@@ -1446,7 +1473,18 @@ function runTeamSim(){
         ${origAdjCell}
         <td class="r">${fmt(cap)}</td>
         <td>${repDualBar(calls,adjCalls,cap)}</td>
-        <td>${sBadge(calls/cap)}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${barCol(calls/cap)};min-width:10px">O</span>
+              ${sBadge(calls/cap)}
+            </div>
+            ${adjCalls!=null?`<div style="display:flex;align-items:center;gap:4px">
+              <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${barCol(adjCalls/cap)};min-width:10px">A</span>
+              ${sBadge(adjCalls/cap)}
+            </div>`:''}
+          </div>
+        </td>
       </tr>`
     }).join('');
     const tUtil2=tC_all/tCap;
@@ -1454,7 +1492,18 @@ function runTeamSim(){
     return`<table>
       <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${teamHasAdj?' / Adjusted':''}<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation${teamHasAdj?'<div style="font-size:8px;font-weight:400">O=Original · A=Adjusted</div>':''}</th><th>Status</th></tr>
       ${rows}
-      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div>${tAdj2!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb)">${fmt(tAdj2)} adj.</div>`:''}</td><td class="r">${fmt(tCap)}</td><td>${repDualBar(tC_all,tAdj2,tCap)}</td><td>${sBadge(tUtil2)}</td></tr>
+      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div>${tAdj2!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb)">${fmt(tAdj2)} adj.</div>`:''}</td><td class="r">${fmt(tCap)}</td><td>${repDualBar(tC_all,tAdj2,tCap)}</td><td>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${barCol(tUtil2)};min-width:10px">O</span>
+              ${sBadge(tUtil2)}
+            </div>
+            ${tAdj2!=null?`<div style="display:flex;align-items:center;gap:4px">
+              <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${barCol(tAdj2/tCap)};min-width:10px">A</span>
+              ${sBadge(tAdj2/tCap)}
+            </div>`:''}
+          </div>
+        </td></tr>
     </table>`
   }
 
@@ -1529,16 +1578,43 @@ function runTeamSim(){
       });
     });
   });
-  // Capacity flags
-  if(tUtil>0.9)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% utilisation — near ceiling. Any new product launch without reducing existing call plans will breach capacity.`});
-  if(tUtil<0.70)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% utilisation — under-utilised. Consider expanding HCP target list or reviewing whether call frequency norms are set too low.`});
+  // Overall utilisation flags
+  if(tUtil>0.9)ins.push({cls:'warn',t:`Team original plan at ${(tUtil*100).toFixed(1)}% — near ceiling. Any new product launch without call frequency reduction will breach capacity. Review Gain and Observe call frequency norms first.`});
+  if(tUtil>1)ins.push({cls:'crit',t:`Team original plan exceeds capacity. Immediate action needed: reduce call frequency per segment, reduce number of targeted HCPs, or discuss headcount increase.`});
+  if(tUtil<0.70)ins.push({cls:'warn',t:`Team original plan at ${(tUtil*100).toFixed(1)}% — under-utilised. Spare capacity of ${fmt(tCap-tCalls)} calls. Consider expanding HCP target list or reviewing call frequency norms upward.`});
   const over=repData.filter(d=>d.util>1);
-  if(over.length)ins.push({cls:'crit',t:`${over.map(d=>d.r.name||'Rep').join(', ')} over capacity. Redistribute HCPs or reduce call frequency.`});
+  if(over.length)ins.push({cls:'crit',t:`${over.map(d=>d.r.name||'Rep').join(', ')} over capacity (original plan). Redistribute HCPs to under-loaded reps or reduce call frequency.`});
   const under=repData.filter(d=>d.util<0.70);
-  if(under.length&&under.length<repData.length)ins.push({cls:'warn',t:`${under.map(d=>d.r.name||'Rep').join(', ')} under-utilised (<70%). This capacity can absorb additional HCP targets or support a new product launch.`});
+  if(under.length&&under.length<repData.length)ins.push({cls:'warn',t:`${under.map(d=>d.r.name||'Rep').join(', ')} under-utilised (<70%). Their spare capacity can absorb redistributed HCPs or support new product calls.`});
+  // Original vs Adjusted commentary
+  const teamHasAdjIns=repData.some(d=>d.totalAdj!=null);
+  if(teamHasAdjIns){
+    const totalOrig=repData.reduce((s,d)=>s+d.totalCalls,0);
+    const totalAdj2=repData.reduce((s,d)=>s+(d.totalAdj!=null?d.totalAdj:d.totalCalls),0);
+    const gapPct=totalOrig>0?((totalOrig-totalAdj2)/totalOrig*100).toFixed(0):0;
+    if(+gapPct>20){
+      ins.push({cls:'warn',t:`Original vs Adjusted gap: ${gapPct}% lower in adjusted plan (${fmt(totalAdj2)} vs ${fmt(totalOrig)}). This suggests current call frequency norms may be too ambitious for this team's territory. Review segment call frequencies — particularly Gain and Observe — and consider revising downward to reflect realistic access.`});
+    } else if(+gapPct>0){
+      ins.push({cls:'',t:`Original vs Adjusted gap: ${gapPct}% (${fmt(totalAdj2)} vs ${fmt(totalOrig)}). Minor gap is normal — reps adjust for access and non-consent. Monitor trends over cycles.`});
+    }
+    // Per-rep O vs A commentary for large individual gaps
+    repData.forEach(d=>{
+      if(d.totalAdj!=null){
+        const rGap=d.totalCalls>0?((d.totalCalls-d.totalAdj)/d.totalCalls*100).toFixed(0):0;
+        if(+rGap>25){
+          ins.push({cls:'warn',t:`${d.r.name||'Rep'}: adjusted plan is ${rGap}% below original (${fmt(d.totalAdj)} vs ${fmt(d.totalCalls)}). Review whether their territory has specific access constraints, or whether HCP segmentation should be revised to reflect realistic call targets.`});
+        }
+      }
+    });
+  }
 
   saveCurrentScenState();
   S().teamResult={teamUtil:tUtil,tCalls,tCap,pLbl,ts:new Date().toISOString()};
+
+  // Pre-compute adj totals for KPI
+  const tHasAdj=repData.some(d=>d.totalAdj!=null);
+  const tTotalAdj=tHasAdj?repData.reduce((s,d)=>s+(d.totalAdj!=null?d.totalAdj:d.totalCalls),0):null;
+  const tAdjUtil=tTotalAdj!=null?tTotalAdj/tCap:null;
 
   document.getElementById('team-results').innerHTML=`
     <div>
@@ -1549,7 +1625,21 @@ function runTeamSim(){
       </div>
       <div class="kpi-row">
         <div class="kpi"><div class="kpi-lbl">Team Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(tCap)}</div><div class="kpi-sub">${fmt(cap)} / rep</div></div>
-        <div class="kpi"><div class="kpi-lbl">Utilisation</div><div class="kpi-val" style="color:${barCol(tUtil)}">${(tUtil*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(tUtil)}</div></div>
+        <div class="kpi" style="${tHasAdj?'border-color:var(--bdr2);':''}">
+          <div class="kpi-lbl">Utilisation</div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+            <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--tx3)">O</div>
+            <div class="kpi-val" style="color:${barCol(tUtil)};font-size:${tHasAdj?'20px':'24px'}">${(tUtil*100).toFixed(1)}%</div>
+            <div class="kpi-sub" style="margin-top:0">${sBadge(tUtil)}</div>
+          </div>
+          ${tHasAdj?`<div style="height:1px;background:var(--bdr);margin:4px 0"></div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--amb)">A</div>
+            <div class="kpi-val" style="color:${barCol(tAdjUtil)};font-size:20px">${(tAdjUtil*100).toFixed(1)}%</div>
+            <div class="kpi-sub" style="margin-top:0">${sBadge(tAdjUtil)}</div>
+          </div>
+          <div class="kpi-sub" style="margin-top:4px;color:var(--tx3)">O=Original (HCP×Freq) · A=Adjusted</div>`:''}
+        </div>
         <div class="kpi"><div class="kpi-lbl">Gov Calls</div><div class="kpi-val" style="color:#1a3a8a">${fmt(tGov)}</div><div class="kpi-sub">${(tGov/tCalls*100).toFixed(0)}% of total</div></div>
         <div class="kpi"><div class="kpi-lbl">Private Calls</div><div class="kpi-val" style="color:#5b3a8a">${fmt(tPvt)}</div><div class="kpi-sub">${(tPvt/tCalls*100).toFixed(0)}% of total</div></div>
       </div>
