@@ -270,6 +270,9 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
   <div class="btn-row">
     <button class="btn btn-grn btn-full" onclick="runProdSim()">▶ Run Simulation</button>
   </div>
+  <div style="margin-top:6px">
+    <button class="btn btn-ghost btn-full btn-sm" onclick="refreshProdSim()" style="color:var(--red);border-color:#fca5a5">↺ Refresh / Clear All</button>
+  </div>
 </aside>
 <main class="main-area" id="prod-results">
   <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-t">Configure & Run Simulation</div><div class="empty-s">Add products and periods, then click Run Simulation</div></div>
@@ -281,7 +284,7 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
 <aside class="sidebar">
   <div class="sec-label">Team Settings</div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Sync from Product Simulation settings</span>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Sync settings, products &amp; freq from Product Simulation</span>
     <button class="sc-btn" style="font-size:10px;padding:3px 10px" onclick="syncTeamSettings()">⟳ Sync</button>
   </div>
   <div class="row2">
@@ -309,6 +312,9 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
 
   <div class="btn-row">
     <button class="btn btn-grn btn-full" onclick="runTeamSim()">▶ Run Team Analysis</button>
+  </div>
+  <div style="margin-top:6px">
+    <button class="btn btn-ghost btn-full btn-sm" onclick="refreshTeam()" style="color:var(--red);border-color:#fca5a5">↺ Refresh / Clear All</button>
   </div>
 </aside>
 <main class="main-area" id="team-results">
@@ -424,16 +430,19 @@ function switchMod(mod,btn){
   if(mod==='compare')renderCompare()
 }
 function syncTeamSettings(silent=false){
+  // Sync basic settings
   const days=document.getElementById('p-days').value;
   const cpd=document.getElementById('p-cpd').value;
-  const repsN=document.getElementById('p-reps').value;
   if(days)document.getElementById('t-days').value=days;
   if(cpd)document.getElementById('t-cpd').value=cpd;
-  // Infer period from first planning period
   if(periods.length>0){
     const h=periods[0].halfYears;
     document.getElementById('t-period').value=h<=1?0.5:1;
   }
+  // Also sync products + call frequencies from product simulation
+  syncTeamProds(true);
+  renderTeamProdRef();
+  renderRepList();
   markDirty();
   if(!silent){
     const btn=document.querySelector('[onclick*="syncTeamSettings"]');
@@ -825,8 +834,11 @@ const periods=[];
 let activePeriodId=null;
 function addPeriod(data={}){
   const id='per'+(++periodIdC);
-  const labels=['2026 1H','2026 2H','2027 1H','2027 2H','2028 1H'];
-  const p={id,label:data.label||labels[periods.length]||`Period ${periodIdC}`,halfYears:data.halfYears||1};
+  // Default to current year + next half if none specified
+  const now=new Date();
+  const yr=data.year||(now.getFullYear());
+  const half=data.half||(now.getMonth()<6?1:2);
+  const p={id,year:yr,half,halfYears:data.halfYears||1,label:data.label||`${yr} ${half}H`};
   periods.push(p);
   if(!activePeriodId)activePeriodId=id;
   renderPeriodTabs();markDirty()
@@ -840,15 +852,35 @@ function activatePeriod(id){activePeriodId=id;renderPeriodTabs()}
 function renderPeriodTabs(){
   const el=document.getElementById('period-tabs');
   if(!periods.length){el.innerHTML='<div style="font-size:10px;color:var(--tx3);font-family:var(--mono);padding:4px">No periods — add one</div>';return}
-  el.innerHTML=periods.map(p=>`
-    <div class="per-btn${p.id===activePeriodId?' active':''}" onclick="activatePeriod('${p.id}')">
-      <input style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${p.id===activePeriodId?'#fff':'var(--tx)'};width:60px;text-align:center" 
-        value="${p.label}" oninput="updatePeriod('${p.id}','label',this.value)" onclick="event.stopPropagation()">
-      <div style="font-size:9px;margin-top:1px;opacity:.7">
-        <input type="number" min="1" max="4" value="${p.halfYears}" style="width:18px;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:9px;color:inherit;text-align:center" oninput="updatePeriod('${p.id}','halfYears',+this.value)" onclick="event.stopPropagation()">H
-        <span onclick="event.stopPropagation();removePeriod('${p.id}')" style="cursor:pointer;margin-left:3px;opacity:.6">✕</span>
+  const isActive=(id)=>id===activePeriodId;
+  el.innerHTML=periods.map(p=>{
+    const col=isActive(p.id)?'#fff':'var(--tx)';
+    const yrs=[2024,2025,2026,2027,2028,2029,2030].map(y=>`<option value="${y}"${p.year===y?' selected':''}>${y}</option>`).join('');
+    return`<div class="per-btn${isActive(p.id)?' active':''}" onclick="activatePeriod('${p.id}')">
+      <div style="display:flex;align-items:center;gap:3px;justify-content:center" onclick="event.stopPropagation()">
+        <select style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${col};cursor:pointer;max-width:46px;appearance:none;-webkit-appearance:none;padding:0"
+          onchange="updatePeriodYear('${p.id}',+this.value)">${yrs}</select>
+        <select style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${col};cursor:pointer;max-width:28px;appearance:none;-webkit-appearance:none;padding:0"
+          onchange="updatePeriodHalf('${p.id}',+this.value)">
+          <option value="1"${p.half===1?' selected':''}>1H</option>
+          <option value="2"${p.half===2?' selected':''}>2H</option>
+        </select>
       </div>
-    </div>`).join('')
+      <div style="font-size:9px;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation()">
+        <span style="color:${col};opacity:.7">Cycles:</span>
+        <input type="number" min="1" max="4" value="${p.halfYears}" style="width:22px;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:9px;color:${col};text-align:center" oninput="updatePeriod('${p.id}','halfYears',+this.value)">
+        <span onclick="removePeriod('${p.id}')" style="cursor:pointer;color:${col};opacity:.5;margin-left:2px">✕</span>
+      </div>
+    </div>`;
+  }).join('')
+}
+function updatePeriodYear(id,yr){
+  const p=periods.find(p=>p.id===id);
+  if(p){p.year=yr;p.label=`${yr} ${p.half}H`;markDirty();renderPeriodTabs()}
+}
+function updatePeriodHalf(id,half){
+  const p=periods.find(p=>p.id===id);
+  if(p){p.half=half;p.label=`${yr} ${half}H`.replace('yr',p.year);p.label=`${p.year} ${half}H`;markDirty();renderPeriodTabs()}
 }
 function updatePeriod(id,key,val){const p=periods.find(p=>p.id===id);if(p){p[key]=val;markDirty()}}
 
@@ -861,10 +893,15 @@ function addProd(data={}){
   const color=COLS[(id-1)%COLS.length];
   const ph=data.phase||'growth';
   const cfg=PHASE_CFG[ph];
+  // Freq starts at zero unless explicit data provided or coming from demo
+  const zeroFreq={Gain:0,Build:0,Defend:0,Maintain:0,Observe:0};
   const p={id,color,name:data.name||'',phase:ph,
     hcps:{gov:{Gain:data.gov_gain??0,Build:data.gov_build??0,Defend:data.gov_defend??0,Maintain:data.gov_maintain??0,Observe:data.gov_observe??0},
           pvt:{Gain:data.pvt_gain??0,Build:data.pvt_build??0,Defend:data.pvt_defend??0,Maintain:data.pvt_maintain??0,Observe:data.pvt_observe??0}},
-    freq:{gov:{...cfg.freqGov,...(data.fgov||{})},pvt:{...cfg.freqPvt,...(data.fpvt||{})}}
+    freq:{
+      gov:data.fgov?{...data.fgov}:{...zeroFreq},
+      pvt:data.fpvt?{...data.fpvt}:{...zeroFreq}
+    }
   };
   prods.push(p);renderProdList();markDirty();return p
 }
@@ -1134,7 +1171,7 @@ function loadProdDemo(){
 const teamProds=[];
 const reps=[];
 function dfSeg(){return{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0}}
-function dfFreq(){return{gov:{Gain:8,Build:8,Defend:8,Maintain:4,Observe:2},pvt:{Gain:6,Build:6,Defend:6,Maintain:4,Observe:2}}}
+function dfFreq(){return{gov:{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0},pvt:{Gain:0,Build:0,Defend:0,Maintain:0,Observe:0}}}
 
 function addTeamProd(data={}){
   const id='tp'+(++prodIdC);
@@ -1147,12 +1184,20 @@ function removeTeamProd(id){
   renderTeamProdRef();renderRepList();markDirty()
 }
 function setTFreq(pid,sec,seg,val){const p=teamProds.find(p=>p.id===pid);if(p){p.freq[sec][seg]=+val;markDirty()}}
-function syncTeamProds(){
+function syncTeamProds(force=false){
   prods.forEach(p=>{
-    if(!teamProds.find(tp=>tp.id==='sp'+p.id)){
-      teamProds.push({id:'sp'+p.id,name:p.name||'Product '+p.id,color:p.color,freq:{gov:{...p.freq.gov},pvt:{...p.freq.pvt}},synced:true})
+    const existing=teamProds.find(tp=>tp.id==='sp'+p.id);
+    if(!existing){
+      // Add new synced product with freq from sim
+      teamProds.push({id:'sp'+p.id,name:p.name||'Product '+p.id,color:p.color,
+        freq:{gov:{...p.freq.gov},pvt:{...p.freq.pvt}},synced:true});
+    } else if(force){
+      // Force-update name, color, and freq from sim
+      existing.name=p.name||existing.name;
+      existing.color=p.color;
+      existing.freq={gov:{...p.freq.gov},pvt:{...p.freq.pvt}};
     }
-  })
+  });
 }
 
 function renderTeamProdRef(){
