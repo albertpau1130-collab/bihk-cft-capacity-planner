@@ -222,7 +222,7 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
     <div class="brand-mark">BI</div>
     <div>
       <div class="brand-name">GTM Capacity Planner</div>
-      <div class="brand-tag">BIHK · Internal Use Only · v3.0</div>
+      <div class="brand-tag">BIHK · Internal Use Only · v3.1.0</div>
     </div>
   </div>
   <div class="mod-tabs">
@@ -907,6 +907,7 @@ function addProd(data={}){
   // Freq starts at zero unless explicit data provided or coming from demo
   const zeroFreq={Gain:0,Build:0,Defend:0,Maintain:0,Observe:0};
   const p={id,color,name:data.name||'',phase:ph,
+    adjCalls:data.adjCalls??null, // null = not set; overrides calculated total when set
     hcps:{gov:{Gain:data.gov_gain??0,Build:data.gov_build??0,Defend:data.gov_defend??0,Maintain:data.gov_maintain??0,Observe:data.gov_observe??0},
           pvt:{Gain:data.pvt_gain??0,Build:data.pvt_build??0,Defend:data.pvt_defend??0,Maintain:data.pvt_maintain??0,Observe:data.pvt_observe??0}},
     freq:{
@@ -921,7 +922,8 @@ function setProdField(id,path,val){
   const p=prods.find(p=>p.id===id);if(!p)return;
   const parts=path.split('.');let obj=p;
   for(let i=0;i<parts.length-1;i++)obj=obj[parts[i]];
-  obj[parts[parts.length-1]]=isNaN(+val)?val:+val;
+  // adjCalls can be null (unset), otherwise a number
+  obj[parts[parts.length-1]]=(val===null||val==='')?null:(isNaN(+val)?val:+val);
   if(path==='phase'){const cfg=PHASE_CFG[val];p.freq={gov:{...cfg.freqGov},pvt:{...cfg.freqPvt}};renderProdList()}
   markDirty()
 }
@@ -992,6 +994,16 @@ function renderProdList(){
           <div></div>${SEGS.map(s=>`<div class="seg-hdr" style="color:${SEG_COLORS[s]}">${s.substring(0,3)}</div>`).join('')}
         </div>
         ${freqRows}
+        <div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--bdr)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--amb);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Adjusted Total Calls (optional)</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="seg-inp" type="number" min="0" placeholder="e.g. 800"
+              value="${p.adjCalls??''}"
+              style="width:110px;padding:5px 8px;font-size:12px;border-color:${p.adjCalls!=null?'var(--amb)':'var(--bdr)'}"
+              oninput="setProdField(${p.id},'adjCalls',this.value===''?null:+this.value)">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);line-height:1.4">Override planned calls with rep-adjusted actual target per cycle. Leave blank to use HCP × freq calculation.</span>
+          </div>
+        </div>
       </div>`;
     el.appendChild(div)
   })
@@ -1008,19 +1020,23 @@ function runProdSim(){
   const days=+document.getElementById('p-days').value;
   const team=document.getElementById('p-team').value||'Team';
 
-  // Compute per period
+  // Compute per period — planned (HCP×freq) and adjusted (user override)
+  const hasAnyAdj=prods.some(p=>p.adjCalls!=null);
   const periodResults=periods.map(per=>{
     const cap=days*per.halfYears*cpd*repsN;
     const capPerRep=cap/repsN;
-    const totalCalls=prods.reduce((s,p)=>s+calcCalls(p)*per.halfYears,0);
-    const govCalls=prods.reduce((s,p)=>s+calcCalls(p,'gov')*per.halfYears,0);
-    const pvtCalls=prods.reduce((s,p)=>s+calcCalls(p,'pvt')*per.halfYears,0);
+    const byProd=prods.map(p=>{
+      const plannedCalls=calcCalls(p)*per.halfYears;
+      const adjCalls=p.adjCalls!=null?p.adjCalls*per.halfYears:null;
+      return{p,calls:plannedCalls,adjCalls,govCalls:calcCalls(p,'gov')*per.halfYears,pvtCalls:calcCalls(p,'pvt')*per.halfYears,hcps:calcHCPs(p)}
+    });
+    const totalCalls=byProd.reduce((s,b)=>s+b.calls,0);
+    const totalAdj=hasAnyAdj?byProd.reduce((s,b)=>s+(b.adjCalls!=null?b.adjCalls:b.calls),0):null;
+    const govCalls=byProd.reduce((s,b)=>s+b.govCalls,0);
+    const pvtCalls=byProd.reduce((s,b)=>s+b.pvtCalls,0);
     const util=cap>0?totalCalls/cap:0;
-    // per product
-    const byProd=prods.map(p=>({
-      p,calls:calcCalls(p)*per.halfYears,govCalls:calcCalls(p,'gov')*per.halfYears,pvtCalls:calcCalls(p,'pvt')*per.halfYears,hcps:calcHCPs(p)
-    }));
-    return{per,cap,capPerRep,totalCalls,govCalls,pvtCalls,util,byProd}
+    const adjUtil=totalAdj!=null&&cap>0?totalAdj/cap:null;
+    return{per,cap,capPerRep,totalCalls,totalAdj,govCalls,pvtCalls,util,adjUtil,byProd}
   });
 
   // Save result
@@ -1029,11 +1045,17 @@ function runProdSim(){
   // Timeline
   const tlHTML=periodResults.map(r=>{
     const pct=Math.min(r.util*100,100);const c=barCol(r.util);
-    return`<div class="tl-period${activePeriodId===r.per.id?' active':''}" onclick="activatePeriod('${r.per.id}');renderProdSimResults(savedResults)">
+    const adjPct=r.adjUtil!=null?Math.min(r.adjUtil*100,100):null;
+    const adjC=r.adjUtil!=null?barCol(r.adjUtil):null;
+    return`<div class="tl-period${activePeriodId===r.per.id?' active':''}" onclick="activatePeriod('${r.per.id}')">
       <div class="tl-period-name">${r.per.label}</div>
       <div class="tl-period-sub">${r.per.halfYears}H · ${repsN} reps</div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--tx3);margin-top:4px">Planned</div>
       <div class="tl-util"><div class="tl-util-fill" style="width:${pct}%;background:${c}"></div></div>
       <div class="tl-util-pct" style="color:${c}">${(r.util*100).toFixed(1)}% ${sBadge(r.util)}</div>
+      ${adjPct!=null?`<div style="font-family:var(--mono);font-size:8px;color:var(--amb);margin-top:4px">Adjusted</div>
+      <div class="tl-util"><div class="tl-util-fill" style="width:${adjPct}%;background:${adjC}"></div></div>
+      <div class="tl-util-pct" style="color:${adjC}">${(r.adjUtil*100).toFixed(1)}% ${sBadge(r.adjUtil)}</div>`:''}
     </div>`
   }).join('');
 
@@ -1041,8 +1063,14 @@ function runProdSim(){
   const actR=periodResults.find(r=>r.per.id===activePeriodId)||periodResults[0];
 
   // Product rows
-  const prodRows=actR.byProd.map(({p,calls,govCalls,pvtCalls,hcps})=>{
+  const showAdj=actR.byProd.some(b=>b.adjCalls!=null);
+  const prodRows=actR.byProd.map(({p,calls,adjCalls,govCalls,pvtCalls,hcps})=>{
     const cfg=PHASE_CFG[p.phase];
+    const achPct=adjCalls!=null&&calls>0?(adjCalls/calls*100).toFixed(0):null;
+    const achCol=achPct!=null?(+achPct>=90?'#1a8a5c':+achPct>=75?'#b45309':'#c0392b'):'';
+    const adjCell=showAdj?(adjCalls!=null
+      ?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(adjCalls)}</td><td class="r"><span style="font-weight:700;color:${achCol}">${achPct}%</span></td>`
+      :`<td class="r" style="color:var(--tx3)">—</td><td class="r">—</td>`):'';
     return`<tr>
       <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:${p.color};border-radius:50%;display:inline-block"></span><strong>${p.name||'—'}</strong></span></td>
       <td><span class="badge" style="background:${cfg.color}22;color:${cfg.color};border:1px solid ${cfg.color}44">${cfg.label}</span></td>
@@ -1050,10 +1078,13 @@ function runProdSim(){
       <td class="r">${fmt(govCalls)}</td>
       <td class="r">${fmt(pvtCalls)}</td>
       <td class="r">${fmt(calls)}</td>
+      ${adjCell}
       <td class="r">${actR.totalCalls>0?(calls/actR.totalCalls*100).toFixed(1):0}%</td>
       <td>${ubar(calls/actR.cap)}</td>
     </tr>`
   }).join('');
+  const adjHeaderCols=showAdj?`<th class="r" style="color:var(--amb)">Adjusted</th><th class="r" style="color:var(--amb)">Achievement</th>`:'';
+  const adjTotalCells=showAdj?(actR.totalAdj!=null?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(actR.totalAdj)}</td><td class="r"><span style="font-weight:700;color:${actR.totalCalls>0&&actR.totalAdj/actR.totalCalls>=0.9?'#1a8a5c':actR.totalAdj/actR.totalCalls>=0.75?'#b45309':'#c0392b'}">${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}%</span></td>`:`<td class="r">—</td><td class="r">—</td>`):'';
 
   // CVM segment per product
   const segProdRows=prods.map(p=>{
@@ -1085,15 +1116,21 @@ function runProdSim(){
       <div class="kpi-row">
         <div class="kpi"><div class="kpi-lbl">Team Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(actR.cap)}</div><div class="kpi-sub">${fmt(actR.capPerRep)} / rep</div></div>
         <div class="kpi"><div class="kpi-lbl">Planned Calls</div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
-        <div class="kpi"><div class="kpi-lbl">Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
-        <div class="kpi"><div class="kpi-lbl">Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over':'available'}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Planned Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
+        ${actR.adjUtil!=null
+          ?`<div class="kpi" style="border-color:var(--amb)"><div class="kpi-lbl" style="color:var(--amb)">Adjusted Utilisation</div><div class="kpi-val" style="color:${barCol(actR.adjUtil)}">${(actR.adjUtil*100).toFixed(1)}%</div><div class="kpi-sub" style="color:var(--amb)">Achievement: ${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}% of planned</div></div>`
+          :`<div class="kpi"><div class="kpi-lbl">Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over':'available'}</div></div>`
+        }
       </div>
       ${eg}
+      ${showAdj?`<div style="background:#fffbf0;border:1.5px solid #e8d5a0;border-left:4px solid var(--amb);border-radius:7px;padding:9px 14px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:#6b4c10">
+        <strong>Adjusted calls entered.</strong> Achievement % = adjusted ÷ planned. Below 80% suggests call frequency norms may be unrealistic for this product — consider revising segment frequencies downward. Below 75% may indicate access difficulty or territory design issues.
+      </div>`:''}
       <div class="tcard">
-        <div class="tcard-head"><div class="tcard-title">Call Volume by Product × Sector</div><div class="tcard-sub">${actR.per.label}</div></div>
-        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total</th><th class="r">Share</th><th>vs Capacity</th></tr>
+        <div class="tcard-head"><div class="tcard-title">Call Volume by Product × Sector</div><div class="tcard-sub">${actR.per.label}${showAdj?' · Adjusted calls shown in amber':''}</div></div>
+        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned</th>${adjHeaderCols}<th class="r">Share</th><th>vs Capacity</th></tr>
           ${prodRows}
-          <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}</td><td class="r">100%</td><td>${ubar(actR.util)}</td></tr>
+          <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}</td>${adjTotalCells}<td class="r">100%</td><td>${ubar(actR.util)}</td></tr>
         </table>
       </div>
       <div class="tcard">
@@ -1236,16 +1273,17 @@ function renderTeamProdRef(){
 function addRep(data={}){
   const id=++repIdC;
   const r={id,name:data.name||'',
-    allocs:teamProds.map(p=>({prodId:p.id,gov:data.gov?.[p.id]?{...data.gov[p.id]}:dfSeg(),pvt:data.pvt?.[p.id]?{...data.pvt[p.id]}:dfSeg()}))
+    allocs:teamProds.map(p=>({prodId:p.id,adjCalls:null,gov:data.gov?.[p.id]?{...data.gov[p.id]}:dfSeg(),pvt:data.pvt?.[p.id]?{...data.pvt[p.id]}:dfSeg()}))
   };
   reps.push(r);renderRepList();markDirty()
 }
 function removeRep(id){const i=reps.findIndex(r=>r.id===id);if(i!==-1)reps.splice(i,1);renderRepList();markDirty()}
 function setRHcp(rid,pid,sec,seg,val){const r=reps.find(r=>r.id===rid);if(!r)return;const a=r.allocs.find(a=>a.prodId===pid);if(a)a[sec][seg]=+val;markDirty()}
+function setRepAdj(rid,pid,val){const r=reps.find(r=>r.id===rid);if(!r)return;const a=r.allocs.find(a=>a.prodId===pid);if(a){a.adjCalls=(val===null||val==='')?null:+val;markDirty();renderRepList()}}
 
 function renderRepList(){
   reps.forEach(r=>{
-    teamProds.forEach(p=>{if(!r.allocs.find(a=>a.prodId===p.id))r.allocs.push({prodId:p.id,gov:dfSeg(),pvt:dfSeg()})});
+    teamProds.forEach(p=>{if(!r.allocs.find(a=>a.prodId===p.id))r.allocs.push({prodId:p.id,adjCalls:null,gov:dfSeg(),pvt:dfSeg()})});
     r.allocs=r.allocs.filter(a=>teamProds.find(p=>p.id===a.prodId))
   });
   const el=document.getElementById('rep-list');
@@ -1288,19 +1326,24 @@ function runTeamSim(){
   const repData=reps.map(r=>{
     let gc=0,pc=0,tHcp=0;
     const byProd={};
+    let hasRepAdj=false;
     r.allocs.forEach(a=>{
       const prod=teamProds.find(p=>p.id===a.prodId);if(!prod)return;
       const gcP=SEGS.reduce((s,sg)=>s+(a.gov[sg]||0)*(prod.freq.gov[sg]||0),0);
       const pcP=SEGS.reduce((s,sg)=>s+(a.pvt[sg]||0)*(prod.freq.pvt[sg]||0),0);
+      const plannedP=gcP+pcP;
+      const adjP=a.adjCalls!=null?a.adjCalls:null;
+      if(adjP!=null)hasRepAdj=true;
       const govH=SEGS.reduce((s,sg)=>s+(a.gov[sg]||0),0);
       const pvtH=SEGS.reduce((s,sg)=>s+(a.pvt[sg]||0),0);
       gc+=gcP;pc+=pcP;tHcp+=govH+pvtH;
       const sgGov={},sgPvt={};
       SEGS.forEach(sg=>{sgGov[sg]=a.gov[sg]||0;sgPvt[sg]=a.pvt[sg]||0});
-      byProd[a.prodId]={calls:gcP+pcP,govCalls:gcP,pvtCalls:pcP,hcps:govH+pvtH,govHcps:govH,pvtHcps:pvtH,sgGov,sgPvt}
+      byProd[a.prodId]={calls:plannedP,adjCalls:adjP,govCalls:gcP,pvtCalls:pcP,hcps:govH+pvtH,govHcps:govH,pvtHcps:pvtH,sgGov,sgPvt}
     });
     const tc=gc+pc;
-    return{r,totalCalls:tc,totalHCPs:tHcp,govCalls:gc,pvtCalls:pc,util:tc/cap,byProd}
+    const tcAdj=hasRepAdj?Object.values(byProd).reduce((s,b)=>s+(b.adjCalls!=null?b.adjCalls:b.calls),0):null;
+    return{r,totalCalls:tc,totalAdj:tcAdj,totalHCPs:tHcp,govCalls:gc,pvtCalls:pc,util:tc/cap,adjUtil:tcAdj!=null?tcAdj/cap:null,byProd}
   });
 
   const tCap=cap*reps.length;
@@ -1338,21 +1381,29 @@ function runTeamSim(){
       const callArrow=devPct(calls,avgCalls);
       const gc=sec!=='pvt'?`<td class="r">${fmt(d.govCalls)}</td>`:'<td class="r">—</td>';
       const pc=sec!=='gov'?`<td class="r">${fmt(d.pvtCalls)}</td>`:'<td class="r">—</td>';
+      const teamHasAdj=repData.some(rd=>rd.totalAdj!=null);
+      const adjCell=teamHasAdj?(d.totalAdj!=null
+        ?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(d.totalAdj)}<div style="font-size:9px;color:${d.totalCalls>0&&d.totalAdj/d.totalCalls>=0.9?'#1a8a5c':d.totalAdj/d.totalCalls>=0.75?'#b45309':'#c0392b'}">${d.totalCalls>0?((d.totalAdj/d.totalCalls)*100).toFixed(0):0}% ach.</div></td>`
+        :`<td class="r" style="color:var(--tx3)">—</td>`):'';
       return`<tr>
         <td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td>
         <td class="r">${fmt(d.totalHCPs)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${hcpShare}${hcpArrow}</div></td>
         ${gc}${pc}
         <td class="r">${fmt(calls)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${callShare}${callArrow}</div></td>
+        ${adjCell}
         <td class="r">${fmt(cap)}</td>
         <td>${ubar(u)}</td>
         <td>${sBadge(u)}</td>
       </tr>`
     }).join('');
     const tUtil2=tC_all/tCap;
+    const teamHasAdj2=repData.some(rd=>rd.totalAdj!=null);
+    const adjHdr=teamHasAdj2?`<th class="r" style="color:var(--amb)">Adjusted<br><span style="font-weight:400;font-size:8px">Achievement</span></th>`:'';
+    const adjTeamCell=teamHasAdj2?(()=>{const tAdj=repData.reduce((s,d)=>s+(d.totalAdj??d.totalCalls),0);const achPct=tC_all>0?((tAdj/tC_all)*100).toFixed(0):0;const col=+achPct>=90?'#1a8a5c':+achPct>=75?'#b45309':'#c0392b';return`<td class="r" style="color:var(--amb);font-weight:700">${fmt(tAdj)}<div style="font-size:9px;color:${col}">${achPct}% ach.</div></td>`})():'';
     return`<table>
-      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total Calls<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>
+      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned<br><span style="font-weight:400;font-size:8px">% share</span></th>${adjHdr}<th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>
       ${rows}
-      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${fmt(tCap)}</td><td>${ubar(tUtil2)}</td><td>${sBadge(tUtil2)}</td></tr>
+      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td>${adjTeamCell}<td class="r">${fmt(tCap)}</td><td>${ubar(tUtil2)}</td><td>${sBadge(tUtil2)}</td></tr>
     </table>`
   }
 
@@ -1533,7 +1584,7 @@ renderRepList();
 
 <footer>
   <span style="font-size:10px;color:var(--tx3)">Designed by AP &nbsp;·&nbsp; BIHK GTM Planning Tool &nbsp;·&nbsp; For Internal Use Only</span>
-  <span style="font-size:10px;color:var(--bdr2)">v3.0.0 &nbsp;·&nbsp; Last updated: May 2026</span>
+  <span style="font-size:10px;color:var(--bdr2)">v3.1.0 &nbsp;·&nbsp; Last updated: 27 May 2026</span>
 </footer>
 </body>
 </html>
