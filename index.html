@@ -1550,25 +1550,38 @@ function runTeamSim(){
         const g=a.sgGov[sg]||0,v=a.sgPvt[sg]||0,t=g+v;
         const pct=a.hcps>0?t/a.hcps*100:0;
         const diff=pct-teamAvg[sg];
-        const arrow=Math.abs(diff)>=10?(diff>0?'<span style="color:#c0392b;font-size:10px">▲</span>':'<span style="color:#1a8a5c;font-size:10px">▼</span>'):'';
+        const absDiff=Math.abs(diff);
+        const deviating=absDiff>=10;
         const col=SEG_COLORS[sg];
-        const bg=t===0?'#f9fbf9':`${col}12`;
-        return`<td style="text-align:center;padding:6px 4px;background:${bg}">
-          <div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%${arrow}</div>
+        // Arrow: neutral dark ink — deviation indicator only, no colour judgement
+        const arrowHtml=deviating
+          ?`<span style="color:#0d2b1a;font-size:14px;font-weight:900;line-height:1;margin-left:2px">${diff>0?'▲':'▼'}</span>`
+          :'';
+        // Background: plain white normally; red tint if above, green tint if below
+        const intensity=absDiff>25?'28':'15';
+        const bg=t===0?'#fafcfa'
+          :deviating?(diff>0?`rgba(192,57,43,0.${intensity})`:`rgba(26,92,56,0.${intensity})`)
+          :'#ffffff';
+        // Border on deviating cells for extra visibility
+        const border=deviating
+          ?`border:1.5px solid ${diff>0?'rgba(192,57,43,0.35)':'rgba(26,92,56,0.35)'};`
+          :'border:1px solid #eaf0ea;';
+        return`<td style="text-align:center;padding:6px 4px;background:${bg};${border}border-radius:4px">
+          <div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%${arrowHtml}</div>
           <div style="font-size:9px;font-family:var(--mono);color:var(--tx3);margin-top:1px"><span style="color:#1a3a8a">${g}</span>/<span style="color:#5b3a8a">${v}</span></div>
         </td>`;
       }).join('');
       return`<tr><td style="font-weight:700;font-size:12px">${d.r.name||'Rep'}</td>${cells}<td class="r" style="font-weight:700">${fmt(a.hcps)}</td></tr>`
     }).join('');
-    const tRow=`<tr class="total"><td>TEAM</td>${SEGS.map(sg=>{
+    const tRow=`<tr class="total"><td>TEAM AVG</td>${SEGS.map(sg=>{
       const t=(pt[prod.id].sgGov[sg]||0)+(pt[prod.id].sgPvt[sg]||0);
       const pct=pt[prod.id].hcps>0?t/pt[prod.id].hcps*100:0;
       const col=SEG_COLORS[sg];
-      return`<td style="text-align:center;background:${col}18"><div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%</div><div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${fmt(t)} HCPs</div></td>`;
+      return`<td style="text-align:center;background:#e8f0e8;border:1px solid #c8d8c8"><div style="font-weight:800;font-family:var(--mono);font-size:13px;color:${col}">${pct.toFixed(0)}%</div><div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${fmt(t)} HCPs</div></td>`;
     }).join('')}<td class="r">${fmt(pt[prod.id].hcps)}</td></tr>`;
     return`<div class="tcard"><div class="tcard-head">
         <div class="tcard-title" style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:${prod.color};border-radius:50%;display:inline-block"></span>${prod.name||'Product'} — CVM Segment % by Rep</div>
-        <div class="tcard-sub">▲▼ = 10pp+ deviation from team avg (highlighted cell) · G=Gov HCPs · P=Pvt HCPs</div>
+        <div class="tcard-sub">Highlighted cell = ≥10pp deviation from TEAM AVG · 🔴 red = above avg · 🟢 green = below avg · ▲▼ neutral arrow = direction of deviation · G=Gov HCPs · P=Pvt HCPs</div>
       </div>
       <table><tr><th>Rep</th>${SEGS.map(s=>`<th style="text-align:center;color:${SEG_COLORS[s]};font-weight:700">${s}</th>`).join('')}<th class="r">Total HCPs</th></tr>${tableRows}${tRow}</table>
     </div>`
