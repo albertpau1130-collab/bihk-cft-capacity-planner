@@ -44,9 +44,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100
 .main-area{flex:1;padding:22px 28px;overflow-y:auto;background:var(--bg)}
 
 /* PERIOD TABS */
-.period-tabs{display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:3px;margin-bottom:14px}
-.per-btn{flex:1;padding:5px;border:none;border-radius:5px;background:transparent;color:var(--tx3);font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
-.per-btn.active{background:var(--grn);color:#fff}
+.period-tabs{display:block;margin-bottom:8px}
+
 
 /* FORM */
 .sec-label{font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--grn);margin-bottom:9px;padding-bottom:5px;border-bottom:2px solid var(--grn)}
@@ -254,11 +253,11 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
 
   <div class="sec-label">Team Setup</div>
   <div class="row2">
-    <div class="fg"><label class="lbl">No. of Reps</label><input class="inp" type="number" id="p-reps" value="4" min="1" max="30" oninput="markDirty()"></div>
-    <div class="fg"><label class="lbl">Calls / Day</label><input class="inp" type="number" id="p-cpd" value="8" min="1" max="15" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">No. of Reps</label><input class="inp" type="number" id="p-reps" value="" placeholder="0" min="0" max="30" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Calls / Day</label><input class="inp" type="number" id="p-cpd" value="" placeholder="0" min="0" max="15" oninput="markDirty()"></div>
   </div>
   <div class="row2">
-    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="p-days" value="115" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="p-days" value="96" placeholder="96" min="1" oninput="markDirty()"></div>
   </div>
   <div class="fg"><label class="lbl">TA Team Name</label><input class="inp" type="text" id="p-team" value="Respiratory / Rheumatology" oninput="markDirty()"></div>
 
@@ -288,8 +287,8 @@ footer{background:var(--bg2);border-top:1px solid var(--bdr);padding:8px 24px;di
     <button class="sc-btn" style="font-size:10px;padding:3px 10px" onclick="syncTeamSettings()">⟳ Sync</button>
   </div>
   <div class="row2">
-    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="t-days" value="115" oninput="markDirty()"></div>
-    <div class="fg"><label class="lbl">Calls/Day</label><input class="inp" type="number" id="t-cpd" value="8" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Working Days</label><input class="inp" type="number" id="t-days" value="96" placeholder="96" min="1" oninput="markDirty()"></div>
+    <div class="fg"><label class="lbl">Calls/Day</label><input class="inp" type="number" id="t-cpd" value="" placeholder="0" min="0" oninput="markDirty()"></div>
   </div>
   <div class="fg"><label class="lbl">Planning Period</label>
     <select class="sel" id="t-period" oninput="markDirty()">
@@ -851,28 +850,40 @@ function removePeriod(id){
 function activatePeriod(id){activePeriodId=id;renderPeriodTabs()}
 function renderPeriodTabs(){
   const el=document.getElementById('period-tabs');
-  if(!periods.length){el.innerHTML='<div style="font-size:10px;color:var(--tx3);font-family:var(--mono);padding:4px">No periods — add one</div>';return}
-  const isActive=(id)=>id===activePeriodId;
+  if(!periods.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--tx3);font-family:var(--mono);padding:6px 0">No periods added yet.</div>';
+    return;
+  }
   el.innerHTML=periods.map(p=>{
-    const col=isActive(p.id)?'#fff':'var(--tx)';
-    const yrs=[2024,2025,2026,2027,2028,2029,2030].map(y=>`<option value="${y}"${p.year===y?' selected':''}>${y}</option>`).join('');
-    return`<div class="per-btn${isActive(p.id)?' active':''}" onclick="activatePeriod('${p.id}')">
-      <div style="display:flex;align-items:center;gap:3px;justify-content:center" onclick="event.stopPropagation()">
-        <select style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${col};cursor:pointer;max-width:46px;appearance:none;-webkit-appearance:none;padding:0"
-          onchange="updatePeriodYear('${p.id}',+this.value)">${yrs}</select>
-        <select style="background:transparent;border:none;outline:none;font-family:var(--sans);font-size:10px;font-weight:700;color:${col};cursor:pointer;max-width:28px;appearance:none;-webkit-appearance:none;padding:0"
-          onchange="updatePeriodHalf('${p.id}',+this.value)">
-          <option value="1"${p.half===1?' selected':''}>1H</option>
-          <option value="2"${p.half===2?' selected':''}>2H</option>
-        </select>
+    const isAct=p.id===activePeriodId;
+    const borderCol=isAct?'var(--grn)':'var(--bdr)';
+    const bgCol=isAct?'#f0faf5':'#fff';
+    const yrs=[2024,2025,2026,2027,2028,2029,2030].map(y=>
+      `<option value="${y}"${p.year===y?' selected':''}>${y}</option>`
+    ).join('');
+    return`<div onclick="activatePeriod('${p.id}')"
+      style="display:flex;align-items:center;gap:6px;padding:7px 10px;margin-bottom:6px;background:${bgCol};border:1.5px solid ${borderCol};border-radius:7px;cursor:pointer;transition:border-color .15s">
+      <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${isAct?'var(--grn)':'var(--tx3)'};min-width:20px">${periods.indexOf(p)+1}.</span>
+      <select onclick="event.stopPropagation()" onchange="updatePeriodYear('${p.id}',+this.value)"
+        style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--tx);outline:none;cursor:pointer">
+        ${yrs}
+      </select>
+      <select onclick="event.stopPropagation()" onchange="updatePeriodHalf('${p.id}',+this.value)"
+        style="width:56px;padding:4px 6px;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--tx);outline:none;cursor:pointer">
+        <option value="1"${p.half===1?' selected':''}>1H</option>
+        <option value="2"${p.half===2?' selected':''}>2H</option>
+      </select>
+      <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:3px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">×</span>
+        <input type="number" min="1" max="4" value="${p.halfYears}"
+          style="width:32px;padding:4px;text-align:center;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
+          onclick="event.stopPropagation()" oninput="updatePeriod('${p.id}','halfYears',+this.value)" title="No. of half-year cycles">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">H</span>
       </div>
-      <div style="font-size:9px;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:4px" onclick="event.stopPropagation()">
-        <span style="color:${col};opacity:.7">Cycles:</span>
-        <input type="number" min="1" max="4" value="${p.halfYears}" style="width:22px;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:9px;color:${col};text-align:center" oninput="updatePeriod('${p.id}','halfYears',+this.value)">
-        <span onclick="removePeriod('${p.id}')" style="cursor:pointer;color:${col};opacity:.5;margin-left:2px">✕</span>
-      </div>
+      <button onclick="event.stopPropagation();removePeriod('${p.id}')"
+        style="padding:2px 7px;border:1px solid #fca5a5;border-radius:4px;background:transparent;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
     </div>`;
-  }).join('')
+  }).join('');
 }
 function updatePeriodYear(id,yr){
   const p=periods.find(p=>p.id===id);
