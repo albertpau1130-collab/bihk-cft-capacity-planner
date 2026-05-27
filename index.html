@@ -1144,7 +1144,7 @@ function runProdSim(){
           <div class="tcard-title">Call Volume by Product × Sector</div>
           <div class="tcard-sub">${actR.per.label}${showAdj?' · O=Original (HCP×Freq) · A=Adjusted · 🟢=OK (70–88%) · 🟡=Under (<70%) or Tight (>88%) · 🔴=Over capacity':''}</div>
         </div>
-        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">O=Original · A=Adjusted</div>':''}</th></tr>
+        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls<br><span style="font-weight:400;font-size:8px">% of team</span></th><th class="r">Pvt Calls<br><span style="font-weight:400;font-size:8px">% of team</span></th><th class="r">Original${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">O=Original · A=Adjusted</div>':''}</th></tr>
           ${prodRows}
           <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}${actR.totalAdj!=null?`<div style="font-family:var(--mono);font-size:9px;color:var(--amb)">${fmt(actR.totalAdj)} adj.</div>`:''}</td><td class="r">100%</td><td>${dualBar?dualBar(actR.totalCalls,actR.totalAdj,actR.cap):ubar(actR.util)}</td></tr>
         </table>
@@ -1182,7 +1182,7 @@ function buildExpertGuidance(actR,prods){
       verdict:'warn',vtext:'UNDER-USED'});
   } else {
     norms.push({icon:'✅',label:'Original Plan: Within Target Range',
-      text:`Original plan at ${(util*100).toFixed(1)}% with ${fmt(actR.cap-actR.totalCalls)} call buffer. Directionally appropriate — a buffer of 10–25% accommodates admin, non-consent, and mid-cycle territory adjustments.`,
+      text:`Original plan at ${(util*100).toFixed(1)}% with ${fmt(actR.cap-actR.totalCalls)} calls of buffer. Directionally appropriate — a buffer of approximately 20% is recommended to accommodate calls on non-targeted doctors (e.g. covering for absent doctors, reactive visits, new referrals) and mid-cycle territory adjustments.`,
       verdict:'ok',vtext:'ON TRACK'});
   }
 
@@ -1192,11 +1192,11 @@ function buildExpertGuidance(actR,prods){
     const diffPct=actR.totalCalls>0?(diff/actR.totalCalls*100).toFixed(0):0;
     if(+diffPct>20){
       norms.push({icon:'📋',label:'Original vs Adjusted: Large Gap — Review Call Frequency Norms',
-        text:`Adjusted target is ${diffPct}% lower than original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). This gap suggests the current call frequency norms by segment may be set too high to be achievable in practice — possibly due to doctor access difficulty, HCP non-consent, or territory logistics. Action: review and lower the call frequency per segment (particularly for Gain or Observe) to make the original plan more realistic.`,
+        text:`Adjusted target is ${diffPct}% lower than original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). This gap suggests call frequency norms may be set too high for this territory — possibly due to doctor access difficulty or hard-to-visit accounts. Action: review and lower the call frequency per segment (particularly for Gain or Observe) to align the plan with what is realistically achievable.`,
         verdict:'warn',vtext:'REVISE FREQ NORMS'});
     } else if(+diffPct>0&&+diffPct<=20){
       norms.push({icon:'📋',label:'Original vs Adjusted: Minor Gap — Manageable',
-        text:`Adjusted target is ${diffPct}% below original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). A small gap is expected and normal — reps adjust for access difficulty and non-consent. No immediate change to frequency norms is required, but monitor over time.`,
+        text:`Adjusted target is ${diffPct}% below original (${fmt(actR.totalAdj)} vs ${fmt(actR.totalCalls)}). A small gap is expected and manageable — reps may adjust for access difficulty or hard-to-visit doctors. No immediate change to frequency norms is required, but monitor across cycles.`,
         verdict:'ok',vtext:'ACCEPTABLE GAP'});
     } else if(+diffPct<0){
       norms.push({icon:'📋',label:'Original vs Adjusted: Adjusted Exceeds Original',
@@ -1463,6 +1463,9 @@ function runTeamSim(){
         </div>`:''}
       </div>`;
     };
+    // Averages for gov and pvt deviation
+    const avgGov=repData.length>0?tGov/repData.length:0;
+    const avgPvt=repData.length>0?tPvt/repData.length:0;
     const rows=repData.map(d=>{
       const calls=sec==='all'?d.totalCalls:sec==='gov'?d.govCalls:d.pvtCalls;
       const adjCalls=d.totalAdj;
@@ -1470,15 +1473,29 @@ function runTeamSim(){
       const callShare=tC_all>0?(calls/tC_all*100).toFixed(1)+'%':'—';
       const hcpDev=devInfo(d.totalHCPs,avgHCPs);
       const callDev=devInfo(calls,avgCalls);
-      const gc=sec!=='pvt'?`<td class="r">${fmt(d.govCalls)}</td>`:'<td class="r">—</td>';
-      const pc=sec!=='gov'?`<td class="r">${fmt(d.pvtCalls)}</td>`:'<td class="r">—</td>';
+      const govDev=devInfo(d.govCalls,avgGov);
+      const pvtDev=devInfo(d.pvtCalls,avgPvt);
+      // Gov calls cell
+      const gc=sec!=='pvt'
+        ?`<td class="r" style="${govDev.tint?`background:${govDev.tint};`:''}${govDev.arrow?'border-left:2px solid rgba(0,0,0,0.08)':''}">
+          ${fmt(d.govCalls)}
+          <div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${tGov>0?(d.govCalls/tGov*100).toFixed(1):'0'}%${govDev.arrow}</div>
+        </td>`
+        :'<td class="r">—</td>';
+      // Pvt calls cell
+      const pc=sec!=='gov'
+        ?`<td class="r" style="${pvtDev.tint?`background:${pvtDev.tint};`:''}">
+          ${fmt(d.pvtCalls)}
+          <div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${tPvt>0?(d.pvtCalls/tPvt*100).toFixed(1):'0'}%${pvtDev.arrow}</div>
+        </td>`
+        :'<td class="r">—</td>';
       const origAdjCell=`<td class="r" style="${callDev.tint?`background:${callDev.tint}`:''}">
         ${fmt(calls)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${callShare}${callDev.arrow}</div>
         ${adjCalls!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb);margin-top:1px">${fmt(adjCalls)} adj.</div>`:''}
       </td>`;
       return`<tr>
         <td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td>
-        <td class="r" style="${hcpDev.tint?`background:${hcpDev.tint}`:''}">
+        <td class="r" style="${hcpDev.tint?`background:${hcpDev.tint};`:''}${hcpDev.arrow?'border-left:2px solid rgba(0,0,0,0.08)':''}">
           ${fmt(d.totalHCPs)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${hcpShare}${hcpDev.arrow}</div>
         </td>
         ${gc}${pc}
@@ -1502,7 +1519,7 @@ function runTeamSim(){
     const tUtil2=tC_all/tCap;
     const tAdj2=teamHasAdj?repData.reduce((s,d)=>s+(d.totalAdj??d.totalCalls),0):null;
     return`<table>
-      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${teamHasAdj?' / Adjusted':''}<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation${teamHasAdj?'<div style="font-size:8px;font-weight:400">O=Original · A=Adjusted</div>':''}</th><th>Status</th></tr>
+      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls<br><span style="font-weight:400;font-size:8px">% of team</span></th><th class="r">Pvt Calls<br><span style="font-weight:400;font-size:8px">% of team</span></th><th class="r">Original${teamHasAdj?' / Adjusted':''}<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation${teamHasAdj?'<div style="font-size:8px;font-weight:400">O=Original · A=Adjusted</div>':''}</th><th>Status</th></tr>
       ${rows}
       <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div>${tAdj2!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb)">${fmt(tAdj2)} adj.</div>`:''}</td><td class="r">${fmt(tCap)}</td><td>${repDualBar(tC_all,tAdj2,tCap)}</td><td>
           <div style="display:flex;flex-direction:column;gap:3px">
@@ -1607,7 +1624,7 @@ function runTeamSim(){
     if(+gapPct>20){
       ins.push({cls:'warn',t:`Original vs Adjusted gap: ${gapPct}% lower in adjusted plan (${fmt(totalAdj2)} vs ${fmt(totalOrig)}). This suggests current call frequency norms may be too ambitious for this team's territory. Review segment call frequencies — particularly Gain and Observe — and consider revising downward to reflect realistic access.`});
     } else if(+gapPct>0){
-      ins.push({cls:'',t:`Original vs Adjusted gap: ${gapPct}% (${fmt(totalAdj2)} vs ${fmt(totalOrig)}). Minor gap is normal — reps adjust for access and non-consent. Monitor trends over cycles.`});
+      ins.push({cls:'',t:`Original vs Adjusted gap: ${gapPct}% (${fmt(totalAdj2)} vs ${fmt(totalOrig)}). A minor gap is expected — reps adjust for access difficulty and hard-to-visit accounts. Monitor trend across cycles.`});
     }
     // Per-rep O vs A commentary for large individual gaps
     repData.forEach(d=>{
