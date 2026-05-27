@@ -408,8 +408,8 @@ function markDirty(){isDirty=true;renderScenChips()}
 // UTILS
 // ═══════════════════════════════════════════
 function fmt(n,d=0){if(n===null||n===undefined||isNaN(n))return'—';return n.toLocaleString('en-HK',{minimumFractionDigits:d,maximumFractionDigits:d})}
-function barCol(u){if(u>1)return'#c0392b';if(u>.88)return'#b45309';return'#1a8a5c'}
-function sBadge(u){if(u>1)return'<span class="badge b-over">⚠ OVER</span>';if(u>.88)return'<span class="badge b-warn">⚡ TIGHT</span>';return'<span class="badge b-ok">✓ OK</span>'}
+function barCol(u){if(u>1)return'#c0392b';if(u>.88)return'#b45309';if(u<.70)return'#b45309';return'#1a8a5c'}
+function sBadge(u){if(u>1)return'<span class="badge b-over">⚠ OVER</span>';if(u>.88)return'<span class="badge b-warn">⚡ TIGHT</span>';if(u<.70)return'<span class="badge b-warn">↓ UNDER</span>';return'<span class="badge b-ok">✓ OK</span>'}
 function ubar(u){const p=Math.min(u*100,100),c=barCol(u);return`<div class="ubar"><div class="ubar-track"><div class="ubar-fill" style="width:${p}%;background:${c}"></div></div><div class="ubar-pct" style="color:${c}">${(u*100).toFixed(1)}%</div></div>`}
 
 // ═══════════════════════════════════════════
@@ -527,10 +527,31 @@ function showExportModal(){
   document.getElementById('modal-scen-name').textContent=S().name;
   document.getElementById('export-modal').style.display='flex'
 }
+function buildFileName(ext){
+  const s=S();
+  const activeMod=document.querySelector('.shell.active')?.id||'';
+  const isTeam=activeMod==='shell-team';
+  let parts=[];
+  if(isTeam){
+    parts.push('TeamCapacity');
+    const prodNames=(s.teamProds||[]).map(p=>p.name||'').filter(Boolean);
+    if(prodNames.length)parts=parts.concat(prodNames);
+    const repNames=(s.reps||[]).map(r=>r.name||'').filter(Boolean);
+    if(repNames.length)parts=parts.concat(repNames);
+  } else {
+    parts.push('ProductSim');
+    const prodNames=(s.prods||[]).map(p=>p.name||'').filter(Boolean);
+    if(prodNames.length)parts=parts.concat(prodNames);
+    const team=document.getElementById('p-team')?.value||'';
+    if(team)parts.push(team);
+  }
+  const name=parts.map(p=>p.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')).join('_');
+  return (name||'BIHK_Plan')+'.'+ext;
+}
 function exportJSON(){
   saveCurrentScenState();
   const data=JSON.stringify(scenarios.find(s=>s.id===activeSId),null,2);
-  dl(`BIHK_${S().name.replace(/\s/g,'_')}.json`,data,'application/json')
+  dl(buildFileName('json'),data,'application/json')
 }
 function exportCSV(){
   saveCurrentScenState();const s=S();
@@ -540,7 +561,7 @@ function exportCSV(){
       csv+=`"${p.name}","${p.phase}","${sec.toUpperCase()}",${SEGS.map(sg=>p.hcps[sec][sg]||0).join(',')},${SEGS.map(sg=>p.freq[sec][sg]||0).join(',')}\n`
     })
   });
-  dl(`BIHK_${s.name.replace(/\s/g,'_')}.csv`,csv,'text/csv')
+  dl(buildFileName('csv'),csv,'text/csv')
 }
 function exportPDF(){
   saveCurrentScenState();
@@ -691,7 +712,7 @@ function exportPDF(){
   win.document.write(`<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
-<title>BIHK GTM Planner — ${scenName}</title>
+<title>${buildFileName('pdf').replace('.pdf','')} — ${ts}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Familjen+Grotesk:wght@400;500;600;700&display=swap');
 :root{--bg:#fff;--bg2:#f4f7f4;--bg3:#e8f0e8;--bdr:#c8d8c8;--bdr2:#9dba9d;--grn:#1a5c38;--grn2:#0d3d24;--amb:#b45309;--red:#c0392b;--tx:#0d2b1a;--tx2:#2d5a3d;--tx3:#5a8a6a;--mono:'IBM Plex Mono',monospace;--sans:'Familjen Grotesk',sans-serif}
@@ -1056,17 +1077,6 @@ function buildExpertGuidance(actR,prods){
     text:`${(util*100).toFixed(1)}% utilisation with ${fmt(actR.cap-actR.totalCalls)} call buffer. A buffer of 10–25% is directionally recommended to accommodate non-consent, admin time, ad-hoc medical requests, and mid-cycle territory adjustments.`,
     verdict:'ok',vtext:'ON TRACK'});
 
-  // Sector balance
-  if(govShare>.88)norms.push({icon:'🏛',label:'Government Sector Over-Concentration',
-    text:`${(govShare*100).toFixed(0)}% of calls in government. In the HK market context, HA hospitals typically drive the majority of prescription volume, but private sector is strategically important for launch products given faster adoption and no formulary dependency. Consider whether private sector investment is adequate for any launch product in the portfolio.`,
-    verdict:'warn',vtext:'REVIEW'});
-  else if(pvtShare>.55)norms.push({icon:'🏥',label:'Private Sector Dominance',
-    text:`${(pvtShare*100).toFixed(0)}% of calls private. This may be appropriate for launch-phase portfolios. Ensure HA formulary relationships and KOL engagement are maintained in parallel.`,
-    verdict:'ok',vtext:'REVIEW HA'});
-  else norms.push({icon:'⚖️',label:'Sector Balance: Distributed',
-    text:`Gov ${(govShare*100).toFixed(0)}% / Private ${(pvtShare*100).toFixed(0)}%. Coverage appears balanced across sectors. Validate whether the split reflects your revenue contribution and launch priority by product.`,
-    verdict:'ok',vtext:'BALANCED'});
-
   // Phase mix advice
   const launches=prods.filter(p=>p.phase==='launch');
   const matures=prods.filter(p=>p.phase==='maturation'||p.phase==='loe');
@@ -1249,14 +1259,45 @@ function runTeamSim(){
   repData.forEach(d=>teamProds.forEach(p=>{const a=d.byProd[p.id];if(!a)return;pt[p.id].calls+=a.calls;pt[p.id].hcps+=a.hcps;pt[p.id].govCalls+=a.govCalls;pt[p.id].pvtCalls+=a.pvtCalls;SEGS.forEach(s=>{pt[p.id].sgGov[s]+=a.sgGov[s]||0;pt[p.id].sgPvt[s]+=a.sgPvt[s]||0})}));
 
   function repTable(sec){
+    // Compute team-level totals for % share and deviation arrows
+    const tHCPs=repData.reduce((s,d)=>s+d.totalHCPs,0);
+    const tC_all=sec==='all'?tCalls:sec==='gov'?tGov:tPvt;
+    const avgHCPs=repData.length>0?tHCPs/repData.length:0;
+    const avgCalls=repData.length>0?tC_all/repData.length:0;
+    // deviation threshold: 15% of team avg is significant
+    const devPct=(val,avg)=>{
+      const pct=avg>0?(val-avg)/avg*100:0;
+      const absP=Math.abs(pct);
+      if(absP<15)return'';
+      return pct>0
+        ?'<span style="color:#c0392b;font-size:15px;font-weight:900;line-height:1;margin-left:3px">▲</span>'
+        :'<span style="color:#1a8a5c;font-size:15px;font-weight:900;line-height:1;margin-left:3px">▼</span>';
+    };
     const rows=repData.map(d=>{
       const calls=sec==='all'?d.totalCalls:sec==='gov'?d.govCalls:d.pvtCalls;
       const u=calls/cap;
-      const stack=teamProds.map(p=>{const a=d.byProd[p.id];const c=a?sec==='all'?a.calls:sec==='gov'?a.govCalls:a.pvtCalls:0;const w=cap>0?(c/cap*100).toFixed(1):0;return`<div class="stack-seg" style="width:${w}%;background:${p.color}" title="${p.name||'—'}: ${fmt(c)}">${+w>6?fmt(c):''}</div>`}).join('');
-      return`<tr><td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td><td class="r">${fmt(d.totalHCPs)}</td><td class="r">${sec!=='pvt'?fmt(d.govCalls):'—'}</td><td class="r">${sec!=='gov'?fmt(d.pvtCalls):'—'}</td><td class="r">${fmt(calls)}</td><td class="r">${fmt(cap)}</td><td>${ubar(u)}</td><td>${sBadge(u)}</td></tr>`
+      const hcpShare=tHCPs>0?(d.totalHCPs/tHCPs*100).toFixed(1)+'%':'—';
+      const callShare=tC_all>0?(calls/tC_all*100).toFixed(1)+'%':'—';
+      const hcpArrow=devPct(d.totalHCPs,avgHCPs);
+      const callArrow=devPct(calls,avgCalls);
+      const gc=sec!=='pvt'?`<td class="r">${fmt(d.govCalls)}</td>`:'<td class="r">—</td>';
+      const pc=sec!=='gov'?`<td class="r">${fmt(d.pvtCalls)}</td>`:'<td class="r">—</td>';
+      return`<tr>
+        <td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td>
+        <td class="r">${fmt(d.totalHCPs)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${hcpShare}${hcpArrow}</div></td>
+        ${gc}${pc}
+        <td class="r">${fmt(calls)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${callShare}${callArrow}</div></td>
+        <td class="r">${fmt(cap)}</td>
+        <td>${ubar(u)}</td>
+        <td>${sBadge(u)}</td>
+      </tr>`
     }).join('');
-    const tC=sec==='all'?tCalls:sec==='gov'?tGov:tPvt;
-    return`<table><tr><th>Rep</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total</th><th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>${rows}<tr class="total"><td>TEAM</td><td class="r"></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC)}</td><td class="r">${fmt(tCap)}</td><td>${ubar(tC/tCap)}</td><td>${sBadge(tC/tCap)}</td></tr></table>`
+    const tUtil2=tC_all/tCap;
+    return`<table>
+      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Total Calls<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>
+      ${rows}
+      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${fmt(tCap)}</td><td>${ubar(tUtil2)}</td><td>${sBadge(tUtil2)}</td></tr>
+    </table>`
   }
 
   // Segment ratio table per product — bold % with colors and arrows vs team
@@ -1297,14 +1338,46 @@ function runTeamSim(){
     </div>`
   }).join('');
 
+  const tHCPs=repData.reduce((s,d)=>s+d.totalHCPs,0);
   const ins=[];
+  // Calls range & imbalance
   const mx=Math.max(...repData.map(d=>d.totalCalls)),mn=Math.min(...repData.map(d=>d.totalCalls));
+  const avgCallsTeam=tCalls/repData.length;
   const imb=mn>0?mx/mn:Infinity;
-  if(imb>1.4){const bsy=repData.find(d=>d.totalCalls===mx),lgt=repData.find(d=>d.totalCalls===mn);ins.push({cls:'warn',t:`Territory Imbalance: ${imb.toFixed(1)}× ratio. ${bsy.r.name||'Busiest'} carries ${fmt(mx)} vs ${fmt(mn)} for ${lgt.r.name||'lightest'}. Rebalance HCP assignments.`})}
-  if(tUtil>0.9)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% — near ceiling. Any new product launch without frequency reduction will overrun.`});
-  const govS=tGov/tCalls,pvtS=tPvt/tCalls;
-  ins.push({cls:'',t:`Gov ${(govS*100).toFixed(0)}% · Private ${(pvtS*100).toFixed(0)}%. ${govS>.88?'Heavy gov — check private coverage for launch products.':pvtS>.55?'Private-skewed — verify HA relationships maintained.':'Balanced.'}`});
-  const over=repData.filter(d=>d.util>1);if(over.length)ins.push({cls:'crit',t:`${over.map(d=>d.r.name||'Rep').join(', ')} over capacity. Redistribute HCPs.`});
+  if(imb>1.4){
+    const bsy=repData.find(d=>d.totalCalls===mx),lgt=repData.find(d=>d.totalCalls===mn);
+    ins.push({cls:'warn',t:`Call Load Imbalance (${imb.toFixed(1)}× ratio): ${bsy.r.name||'Busiest rep'} carries ${fmt(mx)} calls vs ${fmt(mn)} for ${lgt.r.name||'lightest rep'}. This suggests territory sizes are unequal. Review whether HCP assignment reflects patient concentration and travel efficiency, or whether accounts should be redistributed.`})
+  }
+  // HCP count imbalance
+  const hcpCounts=repData.map(d=>d.totalHCPs);
+  const mxH=Math.max(...hcpCounts),mnH=Math.min(...hcpCounts);
+  const avgH=tHCPs/repData.length;
+  if(mnH>0&&mxH/mnH>1.4){
+    const bsyH=repData.find(d=>d.totalHCPs===mxH),lgtH=repData.find(d=>d.totalHCPs===mnH);
+    ins.push({cls:'warn',t:`HCP Count Imbalance: ${bsyH.r.name||'Rep'} covers ${fmt(mxH)} HCPs vs ${fmt(mnH)} for ${lgtH.r.name||'Rep'}. Unequal HCP loads affect ability to maintain consistent call frequency across the territory. This is a territory design issue — consider reallocating specific accounts to equalise target doctor lists.`})
+  }
+  // Check for significant segment deviations per product
+  teamProds.forEach(prod=>{
+    const teamAvgSeg={};
+    SEGS.forEach(sg=>{const t=(pt[prod.id].sgGov[sg]||0)+(pt[prod.id].sgPvt[sg]||0);teamAvgSeg[sg]=pt[prod.id].hcps>0?t/pt[prod.id].hcps*100:0;});
+    repData.forEach(d=>{
+      const a=d.byProd[prod.id];if(!a||a.hcps===0)return;
+      SEGS.forEach(sg=>{
+        const pct=a.hcps>0?((a.sgGov[sg]||0)+(a.sgPvt[sg]||0))/a.hcps*100:0;
+        const diff=pct-teamAvgSeg[sg];
+        if(Math.abs(diff)>=20){
+          ins.push({cls:'warn',t:`${d.r.name||'Rep'} — ${prod.name||'Product'} ${sg} segment: ${pct.toFixed(0)}% vs team avg ${teamAvgSeg[sg].toFixed(0)}% (${diff>0?'+':''}${diff.toFixed(0)}pp). ${diff>0?'Over-indexed on this segment — verify these HCPs are correctly classified and that call frequency is appropriate.':'Under-indexed vs team — this rep may have fewer target doctors in this segment. Review whether territory boundaries are capturing the right HCP universe.'}`})
+        }
+      });
+    });
+  });
+  // Capacity flags
+  if(tUtil>0.9)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% utilisation — near ceiling. Any new product launch without reducing existing call plans will breach capacity.`});
+  if(tUtil<0.70)ins.push({cls:'warn',t:`Team at ${(tUtil*100).toFixed(1)}% utilisation — under-utilised. Consider expanding HCP target list or reviewing whether call frequency norms are set too low.`});
+  const over=repData.filter(d=>d.util>1);
+  if(over.length)ins.push({cls:'crit',t:`${over.map(d=>d.r.name||'Rep').join(', ')} over capacity. Redistribute HCPs or reduce call frequency.`});
+  const under=repData.filter(d=>d.util<0.70);
+  if(under.length&&under.length<repData.length)ins.push({cls:'warn',t:`${under.map(d=>d.r.name||'Rep').join(', ')} under-utilised (<70%). This capacity can absorb additional HCP targets or support a new product launch.`});
 
   saveCurrentScenState();
   S().teamResult={teamUtil:tUtil,tCalls,tCap,pLbl,ts:new Date().toISOString()};
