@@ -837,7 +837,7 @@ function addPeriod(data={}){
   const now=new Date();
   const yr=data.year||(now.getFullYear());
   const half=data.half||(now.getMonth()<6?1:2);
-  const p={id,year:yr,half,halfYears:data.halfYears||1,label:data.label||`${yr} ${half}H`};
+  const p={id,year:yr,half,halfYears:1,label:data.label||`${yr} ${half}H`}; // 1H or 2H is the cycle; halfYears always 1
   periods.push(p);
   if(!activePeriodId)activePeriodId=id;
   renderPeriodTabs();markDirty()
@@ -873,12 +873,7 @@ function renderPeriodTabs(){
         <option value="1"${p.half===1?' selected':''}>1H</option>
         <option value="2"${p.half===2?' selected':''}>2H</option>
       </select>
-      <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:3px">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3)">Cycles:</span>
-        <input type="number" min="1" max="4" value="${p.halfYears}"
-          style="width:36px;padding:4px;text-align:center;border:1px solid var(--bdr);border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
-          onclick="event.stopPropagation()" oninput="updatePeriod('${p.id}','halfYears',+this.value)" title="No. of half-year cycles in this period">
-      </div>
+
       <button onclick="event.stopPropagation();removePeriod('${p.id}')"
         style="padding:2px 7px;border:1px solid #fca5a5;border-radius:4px;background:transparent;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
     </div>`;
@@ -1063,23 +1058,27 @@ function runProdSim(){
 
   // Product rows
   const showAdj=actR.byProd.some(b=>b.adjCalls!=null);
-  // Dual-bar helper (used in product rows and total row)
-  const dualBar=(planned,adj,cap)=>{
-    const pp=cap>0?Math.min(planned/cap*100,100):0;
-    const ap=adj!=null&&cap>0?Math.min(adj/cap*100,100):null;
-    const pc=barCol(planned/cap);
+  // Dual-bar helper — green(ok)/amber(warn)/red(over) for each bar + O/A labels
+  const dualBar=(orig,adj,cap)=>{
+    const op2=cap>0?Math.min(orig/cap*100,100):0;
+    const oc=barCol(orig/cap);  // green ok / amber warn / red over
+    const ap2=adj!=null&&cap>0?Math.min(adj/cap*100,100):null;
+    const ac=adj!=null?barCol(adj/cap):null;
+    const trackCol=(u)=>u>1?'#fde8e8':u>.88?'#fef3c7':u<.70?'#fef3c7':'#d4e6d4';
     return`<div>
-      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
-        <div style="flex:1;height:5px;background:#d4e6d4;border-radius:3px;overflow:hidden;min-width:50px">
-          <div style="height:100%;width:${pp}%;background:${pc};border-radius:3px"></div>
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+        <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${oc};min-width:12px">O</span>
+        <div style="flex:1;height:6px;background:${trackCol(orig/cap)};border-radius:3px;overflow:hidden;min-width:50px">
+          <div style="height:100%;width:${op2}%;background:${oc};border-radius:3px;transition:width .5s"></div>
         </div>
-        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${pc};min-width:36px;text-align:right">${(planned/cap*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${oc};min-width:38px;text-align:right">${(orig/cap*100).toFixed(1)}%</div>
       </div>
-      ${ap!=null?`<div style="display:flex;align-items:center;gap:5px">
-        <div style="flex:1;height:5px;background:#fef3c7;border-radius:3px;overflow:hidden;min-width:50px">
-          <div style="height:100%;width:${ap}%;background:var(--amb);border-radius:3px"></div>
+      ${ap2!=null?`<div style="display:flex;align-items:center;gap:4px">
+        <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${ac};min-width:12px">A</span>
+        <div style="flex:1;height:6px;background:${trackCol(adj/cap)};border-radius:3px;overflow:hidden;min-width:50px">
+          <div style="height:100%;width:${ap2}%;background:${ac};border-radius:3px;transition:width .5s"></div>
         </div>
-        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amb);min-width:36px;text-align:right">${(adj/cap*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${ac};min-width:38px;text-align:right">${(adj/cap*100).toFixed(1)}%</div>
       </div>`:''}
     </div>`;
   };
@@ -1129,23 +1128,23 @@ function runProdSim(){
       <div style="font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--grn)">Team Capacity Utilisation</div>
       <div class="kpi-row">
         <div class="kpi"><div class="kpi-lbl">Available Capacity</div><div class="kpi-val" style="color:var(--grn)">${fmt(actR.cap)}</div><div class="kpi-sub">${fmt(actR.capPerRep)} calls / rep</div></div>
-        <div class="kpi"><div class="kpi-lbl">Planned Calls <span style="font-weight:400;opacity:.7">(HCP × Freq)</span></div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
-        <div class="kpi"><div class="kpi-lbl">Planned Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Original Calls <span style="font-weight:400;opacity:.7">(HCP × Freq)</span></div><div class="kpi-val">${fmt(actR.totalCalls)}</div><div class="kpi-sub">Gov ${fmt(actR.govCalls)} · Pvt ${fmt(actR.pvtCalls)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Original Utilisation</div><div class="kpi-val" style="color:${barCol(actR.util)}">${(actR.util*100).toFixed(1)}%</div><div class="kpi-sub">${sBadge(actR.util)}</div></div>
         ${actR.adjUtil!=null
-          ?`<div class="kpi" style="border-color:var(--amb);border-width:2px"><div class="kpi-lbl" style="color:var(--amb)">Adjusted Utilisation <span style="font-weight:400;opacity:.8">(Rep-adjusted target)</span></div><div class="kpi-val" style="color:${barCol(actR.adjUtil)}">${(actR.adjUtil*100).toFixed(1)}%</div><div class="kpi-sub" style="color:var(--amb)">Adj. calls: ${fmt(actR.totalAdj)} · ${actR.totalCalls>0?((actR.totalAdj/actR.totalCalls)*100).toFixed(0):0}% of planned</div></div>`
+          ?`<div class="kpi" style="border-color:var(--amb);border-width:2px"><div class="kpi-lbl" style="color:var(--amb)">Adjusted Utilisation <span style="font-weight:400;opacity:.8">(Rep-adjusted target)</span></div><div class="kpi-val" style="color:${barCol(actR.adjUtil)}">${(actR.adjUtil*100).toFixed(1)}%</div><div class="kpi-sub" style="color:var(--amb)">Adj. calls: ${fmt(actR.totalAdj)}</div></div>`
           :`<div class="kpi"><div class="kpi-lbl">Remaining Buffer</div><div class="kpi-val" style="color:${actR.cap-actR.totalCalls<0?'var(--red)':'var(--tx)'}">${actR.cap-actR.totalCalls<0?'−':''}${fmt(Math.abs(actR.cap-actR.totalCalls))}</div><div class="kpi-sub">calls ${actR.cap-actR.totalCalls<0?'over capacity':'available'}</div></div>`
         }
       </div>
       ${eg}
       ${showAdj?`<div style="background:#fffbf0;border:1.5px solid #e8d5a0;border-left:4px solid var(--amb);border-radius:7px;padding:9px 14px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:#6b4c10">
-        <strong>Adjusted call targets entered.</strong> Both Planned (HCP × Freq) and Adjusted (rep-adjusted target) are shown. Where adjusted is significantly lower than planned, consider reviewing whether call frequency norms by segment should be revised downward to reflect realistic access.
+        <strong>Adjusted call targets entered.</strong> Both Original (HCP × Freq) and Adjusted (rep-adjusted target) are shown. Where adjusted differs significantly from original, consider reviewing whether call frequency norms by segment should be revised to better reflect realistic access.
       </div>`:''}
       <div class="tcard">
         <div class="tcard-head">
           <div class="tcard-title">Call Volume by Product × Sector</div>
-          <div class="tcard-sub">${actR.per.label}${showAdj?' · Green bar = Planned · Amber bar = Adjusted':''}</div>
+          <div class="tcard-sub">${actR.per.label}${showAdj?' · O=Original (HCP×Freq) · A=Adjusted · bar colour: green=OK, amber=warn, red=over':''}</div>
         </div>
-        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">Green=Planned · Amber=Adjusted</div>':''}</th></tr>
+        <table><tr><th>Product</th><th>Phase</th><th class="r">HCPs</th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${showAdj?' / Adjusted':''}</th><th class="r">Share</th><th>vs Capacity${showAdj?'<div style="font-size:8px;font-weight:400;color:rgba(255,255,255,.65)">O=Original · A=Adjusted</div>':''}</th></tr>
           ${prodRows}
           <tr class="total"><td>TOTAL</td><td></td><td class="r">${fmt(prods.reduce((s,p)=>s+calcHCPs(p),0))}</td><td class="r">${fmt(actR.govCalls)}</td><td class="r">${fmt(actR.pvtCalls)}</td><td class="r">${fmt(actR.totalCalls)}${actR.totalAdj!=null?`<div style="font-family:var(--mono);font-size:9px;color:var(--amb)">${fmt(actR.totalAdj)} adj.</div>`:''}</td><td class="r">100%</td><td>${dualBar?dualBar(actR.totalCalls,actR.totalAdj,actR.cap):ubar(actR.util)}</td></tr>
         </table>
@@ -1296,7 +1295,17 @@ function addRep(data={}){
 }
 function removeRep(id){const i=reps.findIndex(r=>r.id===id);if(i!==-1)reps.splice(i,1);renderRepList();markDirty()}
 function setRHcp(rid,pid,sec,seg,val){const r=reps.find(r=>r.id===rid);if(!r)return;const a=r.allocs.find(a=>a.prodId===pid);if(a)a[sec][seg]=+val;markDirty()}
-function setRepAdj(rid,pid,val){const r=reps.find(r=>r.id===rid);if(!r)return;const a=r.allocs.find(a=>a.prodId===pid);if(a){a.adjCalls=(val===null||val==='')?null:+val;markDirty();renderRepList()}}
+function setRepAdj(rid,pid,val){
+  const r=reps.find(r=>r.id===rid);if(!r)return;
+  const a=r.allocs.find(a=>a.prodId===pid);
+  if(a){
+    a.adjCalls=(val===null||val==='')?null:+val;
+    // Update border colour in-place without re-rendering (avoids focus loss)
+    const inp=document.getElementById('adj-'+rid+'-'+pid);
+    if(inp){inp.style.borderColor=a.adjCalls!=null?'var(--amb)':'var(--bdr)';}
+    markDirty();
+  }
+}
 
 function renderRepList(){
   reps.forEach(r=>{
@@ -1326,6 +1335,7 @@ function renderRepList(){
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding-top:5px;border-top:1px dashed var(--bdr)">
           <span style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amb);white-space:nowrap;min-width:62px">Adj. Calls:</span>
           <input type="number" min="0" placeholder="e.g. 450"
+            id="adj-${r.id}-${p.id}"
             value="${a.adjCalls??''}"
             style="flex:1;padding:4px 6px;border:1.5px solid ${a.adjCalls!=null?'var(--amb)':'var(--bdr)'};border-radius:5px;background:#fff;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none"
             oninput="setRepAdj(${r.id},'${p.id}',this.value===''?null:+this.value)">
@@ -1383,52 +1393,68 @@ function runTeamSim(){
   repData.forEach(d=>teamProds.forEach(p=>{const a=d.byProd[p.id];if(!a)return;pt[p.id].calls+=a.calls;pt[p.id].hcps+=a.hcps;pt[p.id].govCalls+=a.govCalls;pt[p.id].pvtCalls+=a.pvtCalls;SEGS.forEach(s=>{pt[p.id].sgGov[s]+=a.sgGov[s]||0;pt[p.id].sgPvt[s]+=a.sgPvt[s]||0})}));
 
   function repTable(sec){
-    // Compute team-level totals for % share and deviation arrows
     const tHCPs=repData.reduce((s,d)=>s+d.totalHCPs,0);
     const tC_all=sec==='all'?tCalls:sec==='gov'?tGov:tPvt;
     const avgHCPs=repData.length>0?tHCPs/repData.length:0;
     const avgCalls=repData.length>0?tC_all/repData.length:0;
-    // deviation threshold: 15% of team avg is significant
+    const teamHasAdj=repData.some(rd=>rd.totalAdj!=null);
     const devPct=(val,avg)=>{
       const pct=avg>0?(val-avg)/avg*100:0;
-      const absP=Math.abs(pct);
-      if(absP<15)return'';
+      if(Math.abs(pct)<15)return'';
       return pct>0
         ?'<span style="color:#c0392b;font-size:15px;font-weight:900;line-height:1;margin-left:3px">▲</span>'
         :'<span style="color:#1a8a5c;font-size:15px;font-weight:900;line-height:1;margin-left:3px">▼</span>';
     };
+    // Dual-bar for team table (same logic as product sim)
+    const trackCol=(u)=>u>1?'#fde8e8':u>.88?'#fef3c7':u<.70?'#fef3c7':'#d4e6d4';
+    const repDualBar=(orig,adj,capV)=>{
+      const op2=capV>0?Math.min(orig/capV*100,100):0;
+      const oc=barCol(orig/capV);
+      const ap2=adj!=null&&capV>0?Math.min(adj/capV*100,100):null;
+      const ac=adj!=null?barCol(adj/capV):null;
+      return`<div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${oc};min-width:12px">O</span>
+          <div style="flex:1;height:6px;background:${trackCol(orig/capV)};border-radius:3px;overflow:hidden;min-width:50px">
+            <div style="height:100%;width:${op2}%;background:${oc};border-radius:3px"></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${oc};min-width:38px;text-align:right">${(orig/capV*100).toFixed(1)}%</div>
+        </div>
+        ${ap2!=null?`<div style="display:flex;align-items:center;gap:4px">
+          <span style="font-family:var(--mono);font-size:9px;font-weight:900;color:${ac};min-width:12px">A</span>
+          <div style="flex:1;height:6px;background:${trackCol(adj/capV)};border-radius:3px;overflow:hidden;min-width:50px">
+            <div style="height:100%;width:${ap2}%;background:${ac};border-radius:3px"></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${ac};min-width:38px;text-align:right">${(adj/capV*100).toFixed(1)}%</div>
+        </div>`:''}
+      </div>`;
+    };
     const rows=repData.map(d=>{
       const calls=sec==='all'?d.totalCalls:sec==='gov'?d.govCalls:d.pvtCalls;
-      const u=calls/cap;
+      const adjCalls=d.totalAdj;
       const hcpShare=tHCPs>0?(d.totalHCPs/tHCPs*100).toFixed(1)+'%':'—';
       const callShare=tC_all>0?(calls/tC_all*100).toFixed(1)+'%':'—';
       const hcpArrow=devPct(d.totalHCPs,avgHCPs);
       const callArrow=devPct(calls,avgCalls);
       const gc=sec!=='pvt'?`<td class="r">${fmt(d.govCalls)}</td>`:'<td class="r">—</td>';
       const pc=sec!=='gov'?`<td class="r">${fmt(d.pvtCalls)}</td>`:'<td class="r">—</td>';
-      const teamHasAdj=repData.some(rd=>rd.totalAdj!=null);
-      const adjCell=teamHasAdj?(d.totalAdj!=null
-        ?`<td class="r" style="color:var(--amb);font-weight:700">${fmt(d.totalAdj)}<div style="font-size:9px;color:${d.totalCalls>0&&d.totalAdj/d.totalCalls>=0.9?'#1a8a5c':d.totalAdj/d.totalCalls>=0.75?'#b45309':'#c0392b'}">${d.totalCalls>0?((d.totalAdj/d.totalCalls)*100).toFixed(0):0}% ach.</div></td>`
-        :`<td class="r" style="color:var(--tx3)">—</td>`):'';
+      const origAdjCell=`<td class="r">${fmt(calls)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${callShare}${callArrow}</div>${adjCalls!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb);margin-top:1px">${fmt(adjCalls)} adj.</div>`:''}</td>`;
       return`<tr>
         <td style="font-weight:700">${d.r.name||'Rep '+d.r.id}</td>
         <td class="r">${fmt(d.totalHCPs)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${hcpShare}${hcpArrow}</div></td>
         ${gc}${pc}
-        <td class="r">${fmt(calls)}<div style="font-size:9px;font-family:var(--mono);color:var(--tx3)">${callShare}${callArrow}</div></td>
-        ${adjCell}
+        ${origAdjCell}
         <td class="r">${fmt(cap)}</td>
-        <td>${ubar(u)}</td>
-        <td>${sBadge(u)}</td>
+        <td>${repDualBar(calls,adjCalls,cap)}</td>
+        <td>${sBadge(calls/cap)}</td>
       </tr>`
     }).join('');
     const tUtil2=tC_all/tCap;
-    const teamHasAdj2=repData.some(rd=>rd.totalAdj!=null);
-    const adjHdr=teamHasAdj2?`<th class="r" style="color:var(--amb)">Adjusted<br><span style="font-weight:400;font-size:8px">Achievement</span></th>`:'';
-    const adjTeamCell=teamHasAdj2?(()=>{const tAdj=repData.reduce((s,d)=>s+(d.totalAdj??d.totalCalls),0);const achPct=tC_all>0?((tAdj/tC_all)*100).toFixed(0):0;const col=+achPct>=90?'#1a8a5c':+achPct>=75?'#b45309':'#c0392b';return`<td class="r" style="color:var(--amb);font-weight:700">${fmt(tAdj)}<div style="font-size:9px;color:${col}">${achPct}% ach.</div></td>`})():'';
+    const tAdj2=teamHasAdj?repData.reduce((s,d)=>s+(d.totalAdj??d.totalCalls),0):null;
     return`<table>
-      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Planned<br><span style="font-weight:400;font-size:8px">% share</span></th>${adjHdr}<th class="r">Capacity</th><th>Utilisation</th><th>Status</th></tr>
+      <tr><th>Rep</th><th class="r">HCPs<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Gov Calls</th><th class="r">Pvt Calls</th><th class="r">Original${teamHasAdj?' / Adjusted':''}<br><span style="font-weight:400;font-size:8px">% share</span></th><th class="r">Capacity</th><th>Utilisation${teamHasAdj?'<div style="font-size:8px;font-weight:400">O=Original · A=Adjusted</div>':''}</th><th>Status</th></tr>
       ${rows}
-      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td>${adjTeamCell}<td class="r">${fmt(tCap)}</td><td>${ubar(tUtil2)}</td><td>${sBadge(tUtil2)}</td></tr>
+      <tr class="total"><td>TEAM TOTAL</td><td class="r">${fmt(tHCPs)}<div style="font-size:9px;font-family:var(--mono)">100%</div></td><td class="r">${sec!=='pvt'?fmt(tGov):'—'}</td><td class="r">${sec!=='gov'?fmt(tPvt):'—'}</td><td class="r">${fmt(tC_all)}<div style="font-size:9px;font-family:var(--mono)">100%</div>${tAdj2!=null?`<div style="font-size:9px;font-family:var(--mono);color:var(--amb)">${fmt(tAdj2)} adj.</div>`:''}</td><td class="r">${fmt(tCap)}</td><td>${repDualBar(tC_all,tAdj2,tCap)}</td><td>${sBadge(tUtil2)}</td></tr>
     </table>`
   }
 
