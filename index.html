@@ -943,8 +943,15 @@ function parseMCCP(rows,opts){
   let idIdx=H.findIndex(x=>/^external id$/i.test(x));
   if(idIdx<0)idIdx=H.findIndex(x=>/external id/i.test(x)&&!/old/i.test(x));
   if(idIdx<0)idIdx=find(/external id/i);
-  const ci={team:find(/^team$/i),terr:find(reTerr),prod:find(/^product$/i),seg:find(reSeg),sec:find(reSec),freq:find(reFreq),id:idIdx};
+  const ci={team:find(/^team$/i),terr:find(reTerr),prod:find(/^product$/i),seg:find(reSeg),sec:find(reSec),freq:find(reFreq),id:idIdx,name:H.findIndex(x=>/^name$/i.test(x))};
   const hadSegCol=ci.seg>=0;
+  // Choose the HCP identifier: External ID normally, but the Name column when External IDs are
+  // largely incomplete (or opts.preferName) — otherwise blank IDs collapse distinct HCPs into one.
+  let useNameId=false;
+  if(ci.name>=0){
+    if(opts.preferName)useNameId=true;
+    else{let tot=0,blank=0;for(let r=hr+1;r<rows.length;r++){const row=rows[r];if(!row)continue;const tv=ci.terr>=0?row[ci.terr]:null;if(tv==null||String(tv).trim()==='')continue;tot++;const ev=ci.id>=0?String(row[ci.id]==null?'':row[ci.id]).trim():'';if(!ev)blank++;}if(tot>0&&blank/tot>0.2)useNameId=true;}
+  }
   const num=v=>{const n=parseFloat(v);return isFinite(n)?n:null;};
   const mkP=()=>{const o={count:{},sum:{},ids:{}};SEC_KEYS.forEach(k=>{o.count[k]={};o.sum[k]={};o.ids[k]={};SEGS.forEach(s=>{o.count[k][s]=0;o.sum[k][s]=0;o.ids[k][s]={};});});return o;};
   const totals={},repMap={},teamsSeen={},sectorMap={},unmapped={};let skipped=0,noSeg=0;
@@ -960,11 +967,13 @@ function parseMCCP(rows,opts){
     // even if some of its rows are later skipped (unmapped sector, odd segment, blank freq).
     teamsSeen[team]=1;
     if(!repMap[tname])repMap[tname]={name:tname,team,allocs:{},docs:{}};
-    const id=ci.id>=0?String(row[ci.id]==null?'':row[ci.id]).trim():('row'+r);
+    const extid=ci.id>=0?String(row[ci.id]==null?'':row[ci.id]).trim():'';
+    const nm=ci.name>=0?String(row[ci.name]==null?'':row[ci.name]).trim():'';
+    const id=(useNameId?(nm||extid):(extid||nm))||('row'+r);
     const segRaw=String((ci.seg>=0?row[ci.seg]:'')||'').trim();
     let seg=SEGS.find(x=>x.toLowerCase()===segRaw.toLowerCase());
-    // No usable segment in the row → inherit from existing data by External ID (launch on known doctors)…
-    if(!seg&&id&&opts.segByExtId&&opts.segByExtId[id])seg=opts.segByExtId[id];
+    // No usable segment in the row → inherit from existing data by External ID or Name (launch on known doctors)…
+    if(!seg&&opts.segByExtId)seg=opts.segByExtId[id]||(nm&&opts.segByExtId[nm.toLowerCase()])||(extid&&opts.segByExtId[extid])||null;
     if(!seg){
       if(hadSegCol&&segRaw){skipped++;continue;}      // a segment value was present but unrecognised → skip
       seg=fallbackSeg;noSeg++;                          // …otherwise place in a fallback segment and flag it
@@ -979,13 +988,13 @@ function parseMCCP(rows,opts){
     if(!T.ids[sk][seg][key]){T.ids[sk][seg][key]=1;T.count[sk][seg]++;T.sum[sk][seg]+=freq;}
     if(!R.ids[sk][seg][key]){R.ids[sk][seg][key]=1;R.count[sk][seg]++;R.sum[sk][seg]+=freq;}
     // per-doctor record (one physical doctor may be detailed for several products in one visit)
-    const dkey=id||('row'+r);
+    const dkey=id;
     let doc=repMap[tname].docs[dkey];
-    if(!doc){doc=repMap[tname].docs[dkey]={sector:sk,prods:{}};}
+    if(!doc){doc=repMap[tname].docs[dkey]={sector:sk,prods:{},name:nm};}
     // keep the highest adjusted frequency if the same product appears twice for a doctor
     if(!doc.prods[prod]||freq>doc.prods[prod].freq)doc.prods[prod]={seg,freq};
   }
-  return{prods:Object.keys(totals).map(n=>({name:n})),totals,repMap,teams:Object.keys(teamsSeen),sectorMap,unmapped,skipped,noSeg,hadSegCol,sheetHeaderRow:hr};
+  return{prods:Object.keys(totals).map(n=>({name:n})),totals,repMap,teams:Object.keys(teamsSeen),sectorMap,unmapped,skipped,noSeg,hadSegCol,idMode:useNameId?'name':'extid',sheetHeaderRow:hr};
 }
 function deriveTeam(terrs){if(!terrs.length)return'Team';const base=[...new Set(terrs.map(t=>t.replace(/[_-]\d+$/,'')))];return base.length===1?base[0]:(terrs[0].replace(/[_-]\d+$/,'')||'Team');}
 // Parse the "Target Call Frequency" sheet: repeating blocks of
@@ -1063,7 +1072,9 @@ function parseWorkbook(wb,extra){
 function segByExtIdFrom(base){
   const m={};if(!base||!base.repMap)return m;
   Object.keys(base.repMap).forEach(terr=>{const docs=base.repMap[terr].docs||{};Object.keys(docs).forEach(id=>{
-    const pr=docs[id].prods||{};const k=Object.keys(pr)[0];if(k&&pr[k].seg&&!m[id])m[id]=pr[k].seg;
+    const d=docs[id];const pr=d.prods||{};const k=Object.keys(pr)[0];if(!k||!pr[k].seg)return;const seg=pr[k].seg;
+    if(!m[id])m[id]=seg;
+    if(d.name&&!m[d.name.toLowerCase()])m[d.name.toLowerCase()]=seg;
   });});
   return m;
 }
@@ -1108,8 +1119,9 @@ function handleExcelMerge(e){
       applyImported(parsed,false);
       const added=mccpData.prods.map(p=>p.name).filter(n=>!before.has(n));
       const lines=parsed.prods.map(p=>{const t=parsed.totals[p.name];let hc=0;SEC_KEYS.forEach(k=>SEGS.forEach(s=>{hc+=t.count[k][s];}));return '  • '+p.name+': '+hc+' HCPs';}).join('\n');
-      const segWarn=(!parsed.hadSegCol||parsed.noSeg)?('\n\n⚠ This file has no CVM Segment column. Doctors already in your base data were segmented automatically by External ID'+(parsed.noSeg?('; '+parsed.noSeg+' HCP(s) had no match and were placed in "Build" as a placeholder'):'')+'. For accurate per-segment analysis, add a Segment / CVM Segment column to the template.'):'';
-      alert('Merged "'+used+'" into the current dataset.\n\nProducts in this file:\n'+lines+(added.length?'\n\nNew product(s) added: '+added.join(', '):'\n\n(No new product names — data combined into existing products.)')+segWarn+'\n\nDoctors matched across files by External ID are now co-detailed automatically. The full dataset now has '+mccpData.prods.length+' product(s) across '+mccpData.teams.length+' team(s). Use the Product filter to compare the launch brand alongside the existing portfolio.');
+      const segWarn=(!parsed.hadSegCol||parsed.noSeg)?('\n\n⚠ This file has no CVM Segment column. Doctors already in your base data were segmented automatically'+(parsed.noSeg?('; '+parsed.noSeg+' HCP(s) had no match and were placed in "Build" as a placeholder'):'')+'. For accurate per-segment analysis, add a Segment / CVM Segment column to the template.'):'';
+      const idMsg=parsed.idMode==='name'?'\n\nHCPs were counted by the Name column (External IDs in this file were incomplete).':'';
+      alert('Merged "'+used+'" into the current dataset.\n\nProducts in this file:\n'+lines+(added.length?'\n\nNew product(s) added: '+added.join(', '):'\n\n(No new product names — data combined into existing products.)')+idMsg+segWarn+'\n\nDoctors matched across files (by External ID or Name) are co-detailed automatically. The full dataset now has '+mccpData.prods.length+' product(s) across '+mccpData.teams.length+' team(s). Use the Product filter to compare the launch brand alongside the existing portfolio.');
     }catch(err){alert('Could not merge this Excel file.\n\n'+(err&&err.message||err));}
   };
   rd.readAsArrayBuffer(file);
